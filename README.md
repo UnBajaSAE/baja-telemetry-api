@@ -1,0 +1,90 @@
+# baja-telemetry-api
+
+> API de ingestão e consulta de telemetria da equipe **UnBaja SAE**.
+> Recebe frames CAN do ESP32, decodifica em grandezas físicas e armazena em série temporal.
+
+[![status](https://img.shields.io/badge/status-em%20desenvolvimento-orange)]()
+[![kotlin](https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&logoColor=white)]()
+[![spring](https://img.shields.io/badge/Spring%20Boot%203-6DB33F?logo=springboot&logoColor=white)]()
+[![postgres](https://img.shields.io/badge/PostgreSQL%20%2B%20TimescaleDB-4169E1?logo=postgresql&logoColor=white)]()
+
+---
+
+## O problema
+
+Hoje o dado de telemetria nasce e morre no carro. As quatro ECUs conversam pelo barramento CAN,
+o ESP32 lê, o display TFT mostra pro piloto — e acabou. Quando o carro volta pro box, ninguém
+consegue responder:
+
+- Em qual volta a temperatura do motor passou de 100 °C?
+- O RPM caiu naquela curva, ou foi impressão do piloto?
+- O consumo no teste de hoje foi melhor que o da semana passada?
+
+O dado existe, passa pelo ESP32, e é descartado. **Este projeto é a peça que falta para ele parar
+de ser descartado.**
+
+## O que a API faz
+
+Recebe, decodifica, armazena e devolve consultado aquilo que hoje só passa voando pelo display.
+
+```mermaid
+flowchart LR
+    ECU["4 ECUs"] -->|CAN Bus| ESP["ESP32"]
+    ESP --> TFT["Display TFT<br/>(já existe)"]
+    ESP -->|"WiFi · POST /ingest"| API["baja-telemetry-api"]
+    API --> DEC["Decodificador<br/>frame → sinais"]
+    DEC --> DB[("PostgreSQL<br/>+ TimescaleDB")]
+    DB --> Q["GET /sessions/:id/metrics"]
+```
+
+Tudo à esquerda do ESP32 já está construído pela equipe. Este repositório é o bloco novo.
+
+## Sinais monitorados
+
+| Sinal | Unidade | Taxa aproximada |
+|---|---|---|
+| RPM | rpm | 100 Hz |
+| Temperatura do motor | °C | 10 Hz |
+| Velocidade | km/h | 20 Hz |
+| Nível de combustível | % | 1 Hz |
+| GPS (lat/lon) | grau | 5 Hz |
+
+Somando os quatro nós, a ordem de grandeza é de **~500 mensagens por segundo**.
+
+## Stack
+
+| Camada | Escolha | Motivo resumido |
+|---|---|---|
+| Linguagem | Kotlin (JVM) | Null safety no compilador, interop total com o ecossistema Java |
+| Framework | Spring Boot 3 | Padrão de mercado na JVM |
+| Banco | PostgreSQL + TimescaleDB | Série temporal com particionamento automático por tempo |
+| Migrations | Flyway | Schema versionado em git, nunca `ddl-auto` |
+| Testes | JUnit 5 + Testcontainers | Postgres real no teste, não banco em memória |
+| Container | Docker (multi-stage) | Build Gradle → runtime JRE slim |
+| CI/CD | GitHub Actions | Lint → testes → build de imagem |
+
+As justificativas completas estão em [`docs/02-decisoes-tecnicas.md`](docs/02-decisoes-tecnicas.md).
+
+## Documentação
+
+| Documento | Conteúdo |
+|---|---|
+| [`docs/01-dominio-can.md`](docs/01-dominio-can.md) | O que é um frame CAN, como um byte cru vira grandeza física, o que é DBC |
+| [`docs/02-decisoes-tecnicas.md`](docs/02-decisoes-tecnicas.md) | Decisões de arquitetura com justificativa (formato ADR) |
+| [`docs/03-protocolo-ingestao.md`](docs/03-protocolo-ingestao.md) | Contrato entre o ESP32 e a API: lote, idempotência, dado fora de ordem |
+
+## Roadmap
+
+- [ ] **Fase 1 — Esqueleto.** Spring Boot + Kotlin, `POST /ingest`, Postgres via compose, primeiro teste com Testcontainers, gerador de dados sintéticos
+- [ ] **Fase 2 — Modelo de dados.** Flyway, hypertable, batch insert, decodificador de frame
+- [ ] **Fase 3 — Consulta.** Agregação por janela de tempo, paginação por cursor
+- [ ] **Fase 4 — Robustez.** API key, rate limiting, validação, Problem Details (RFC 7807), Actuator
+- [ ] **Fase 5 — Deploy.** Dockerfile multi-stage, deploy gerenciado, teste de carga com número medido
+
+## Como rodar
+
+> Ainda não implementado — será `docker compose up` a partir da Fase 1.
+
+## Equipe
+
+Projeto da equipe [UnBaja SAE](https://github.com/UnBajaSAE) — Universidade de Brasília.
