@@ -183,3 +183,277 @@ qualquer lugar. E o gerador vira ferramenta de teste da própria equipe de eletr
 
 **Esta é a decisão mais subestimada do projeto.** Sem ela, o desenvolvimento fica refém da agenda
 do carro — e projeto que só roda com hardware presente não é demonstrável.
+
+---
+
+## ADR-006 · O DBC como fonte única de verdade
+
+**Status:** aceito
+
+### Contexto
+
+O decodificador precisa saber, para cada frame, quais sinais moram nele e com que bit inicial,
+largura, endianness, escala, offset e faixa. Hoje essa informação existe — mas espalhada pelo
+firmware do ESP32, em `#define` de máscara e `struct` de campo de bit.
+
+Isso já é um problema **antes** desta API existir: se alguém muda a escala do sensor de
+combustível no firmware e não avisa, o display mente e ninguém descobre. Com a API no meio, o
+problema piora — o dado errado passa a ser **persistido**, e um gráfico errado é mais
+convincente que um display errado.
+
+O formato precisa ser decidido antes da primeira linha do decodificador, porque ele é a entrada
+de tudo.
+
+### Decisão
+
+Um arquivo **DBC** (formato Vector, padrão de fato da indústria automotiva) em
+`contracts/can/unbaja.dbc`, lido por um **parser próprio** que cobre o subconjunto `BO_` + `SG_`.
+
+### Alternativas consideradas
+
+**YAML ou JSON próprio.** Zero parser para escrever — o Jackson lê direto. Descartada porque
+joga fora o principal ganho: um formato próprio só este repositório entende. O DBC abre em
+SavvyCAN, CANalyzer, BusMaster e `cantools`, o que significa que a mesma definição serve de
+segunda opinião independente na hora de depurar o barramento na bancada, e que o dia em que a
+equipe adotar qualquer ferramenta de CAN comercial, o arquivo já está pronto.
+
+**Biblioteca de parsing DBC na JVM.** Evitaria escrever código. Descartada por duas razões: as
+opções maduras no ecossistema JVM são escassas e pouco mantidas comparadas ao `cantools` do
+Python, e o subconjunto de que precisamos são duas diretivas — trocar ~80 linhas de código
+testável por uma dependência opaca é mau negócio quando o código em questão é justamente o
+coração do sistema.
+
+**Gerar código Kotlin a partir do DBC em tempo de build.** Mais rápido em runtime, e elimina o
+parsing do caminho quente. Descartada por antecipar otimização: o DBC é lido **uma vez** na
+subida da aplicação, não por frame. Reconsiderar só se a Fase 5 medir isso como gargalo, o que
+é improvável.
+
+### Consequências
+
+**O parser precisa falhar alto.** Ao encontrar uma diretiva não suportada — `VAL_`,
+multiplexação, `BA_` — ele deve levantar erro e recusar a subida da aplicação, **nunca** pular a
+linha em silêncio. Ignorar um `SG_` desconhecido significa perder um sinal inteiro sem que
+ninguém note, que é o modo de falha mais caro deste projeto.
+
+**Ganho que vale por si só, independente da API.** Consolidar o mapa num arquivo versionado
+resolve um problema que a equipe de eletrônica já tem hoje. Mesmo que este backend fosse
+cancelado, o DBC continuaria útil.
+
+**O arquivo atual é fictício.** Foi escrito para destravar o desenvolvimento antes do
+levantamento do firmware. Trocar o conteúdo depois não gera retrabalho, porque o DBC é dado de
+entrada e não código — mas exige reprocessar o histórico a partir de `raw_frame`, que é
+justamente a capacidade que o ADR-001 comprou.
+
+**Custo aceito.** Uma parte do formato DBC fica sem suporte, e cada nova diretiva necessária
+vira trabalho de parser. O limite atual está registrado em
+[`docs/05-mapa-de-sinais.md §5.2`](05-mapa-de-sinais.md).
+
+---
+
+## ADR-007 · O `sessionId` é gerado pelo dispositivo
+
+**Status:** aceito
+
+### Contexto
+
+Toda consulta deste sistema é escopada por sessão — "a bateria de suspensão de terça", "a prova
+de enduro". A sessão precisa de identificador, e alguém precisa criá-lo.
+
+O detalhe que decide: **o carro coleta sem rede.** Ele sai do alcance do WiFi e volta; isso não é
+caso de borda, é o modo normal de operação (ADR-004).
+
+### Decisão
+
+O dispositivo gera o `sessionId`, no formato `AAAA-MM-DD-descricao-em-slug`
+(ex.: `2026-08-24-teste-suspensao`), e o envia em todo lote. A API faz *upsert* — cria a sessão
+na primeira vez que a vê, com `ON CONFLICT DO NOTHING`.
+
+### Alternativas consideradas
+
+**A API cria, via `POST /sessions`.** É o desenho convencional, e garante unicidade porque só um
+lado gera. Descartada por um motivo prático e decisivo: **exigiria rede antes de começar a
+coletar.** O piloto entra na pista, aperta o botão, e o ESP32 não teria id para carimbar nos
+frames que já está lendo. Otimizar para o caso com rede quando o caso sem rede é o normal
+inverte a prioridade.
+
+**UUID gerado pelo dispositivo.** Resolve a unicidade de vez e continua funcionando offline.
+Descartada porque `550e8400-e29b-41d4-a716-446655440000` não diz nada: a lista de sessões vira
+uma parede de hexadecimal, e comparar "o teste de hoje com o da semana passada" — que é o caso de
+uso que motiva o projeto — exige consultar outra tabela para descobrir qual é qual.
+
+### Consequências
+
+**Vários dispositivos compartilham a mesma sessão, e isso é desejado.** Os nós carimbam o mesmo
+`sessionId` e a telemetria dos quatro se junta naturalmente. O `deviceId` distingue a origem
+dentro da sessão.
+
+**Metadados divergentes: o primeiro ganha.** Se dois dispositivos mandarem descrições diferentes
+para o mesmo id, o `ON CONFLICT DO NOTHING` mantém a primeira. Alternativa seria falhar, o que
+significaria rejeitar dado bom por causa de um campo cosmético.
+
+**Erro de digitação cria sessão fantasma.** `2026-08-24-teste-suspenao` vira uma sessão nova, com
+uma fatia dos dados. Risco aceito: um endpoint de renomear/fundir sessão resolve, e entra na
+Fase 3 se acontecer na prática. Impedir isso exigiria validação contra uma lista prévia — ou seja,
+rede antes de coletar, que é justamente o que a decisão evita.
+
+**Requisito para o firmware:** o `sessionId` precisa sobreviver a um reinício do ESP32 no meio da
+coleta. Gravar junto com o buffer no cartão SD, não só em memória.
+
+---
+
+## ADR-008 · Idempotência na granularidade do lote
+
+**Status:** aceito
+
+### Contexto
+
+O ESP32 reenvia quando não sabe se foi entregue (ADR-004). Sem proteção, meia sessão duplica —
+e dado duplicado não gera erro: gera média errada, contagem errada, e um gráfico com o dobro dos
+pontos que parece só "mais denso".
+
+A pergunta é **em que granularidade** detectar a repetição.
+
+### Decisão
+
+No **lote**. O `batchId` gerado pelo dispositivo é `PRIMARY KEY` da tabela `ingest_batch`; lote
+com id já existente é reconhecido e ignorado, e a API responde 200 com `duplicate: true`.
+
+A garantia mora no banco, não numa verificação no código — duas requisições simultâneas com o
+mesmo `batchId` driblariam um `if (jaExiste)`, mas não driblam uma chave primária.
+
+### Alternativa considerada
+
+**Restrição de unicidade no frame**, sobre `(session_id, device_id, frame_time, can_id, payload)`.
+Cobriria um caso que o `batchId` não cobre: o dispositivo reinicia, remonta o buffer com um
+recorte diferente, e os mesmos frames chegam distribuídos em lotes de ids novos.
+
+Descartada por três custos concretos:
+
+1. Um índice único sobre cinco colunas em centenas de milhões de linhas ocupa muito espaço e
+   **paga verificação a cada linha inserida** — 5.000 verificações por lote, no único ponto do
+   sistema onde a taxa de escrita importa.
+2. Gera **falso positivo**: um sinal estável (temperatura parada, marcha engatada) produz
+   legitimamente frames idênticos no mesmo milissegundo. Descartá-los como duplicata perde dado
+   real.
+3. A hypertable obrigaria a incluir a coluna de particionamento no índice (ver
+   [`docs/06 §4.1`](06-modelo-de-dados.md)), o que engorda ainda mais.
+
+### Consequências
+
+**Existe um cenário não coberto, e ele está nomeado.** Reinício com rebufferização diferente
+duplica frames. A mitigação é do lado do firmware, e é barata: **gravar o `batchId` no cartão SD
+junto com o buffer**, e não apenas em memória. Assim o mesmo recorte volta com o mesmo id depois
+do reinício, e a proteção de lote basta.
+
+**É trabalho de firmware, não de backend** — e precisa entrar no
+[`docs/03-protocolo-ingestao.md`](03-protocolo-ingestao.md) como requisito explícito, porque é o
+tipo de detalhe que ninguém deduz lendo só a API.
+
+**Reavaliar com dado medido.** Se a Fase 5 mostrar duplicatas reais no histórico, a restrição por
+frame volta à mesa — aí com número em mãos, não por antecipação.
+
+---
+
+## ADR-009 · Domínio isolado do framework
+
+**Status:** aceito
+
+### Contexto
+
+A estrutura de pacotes precisa ser escolhida antes da primeira classe, senão ela se forma por
+sedimento — cada arquivo novo indo onde deu, até ninguém saber mais onde procurar.
+
+O fator que decide aqui é específico deste projeto: **o decodificador de frame será testado com
+teste de propriedade**, milhares de casos aleatórios por execução. Isso impõe um requisito à
+estrutura, não só ao teste.
+
+### Decisão
+
+Quatro camadas, com uma regra dura: **o pacote `domain` não importa nada de Spring** — nem
+`@Component`, nem Jackson, nem JPA.
+
+```
+domain/       decodificador, parser DBC, modelo de sinal   ← Kotlin puro
+application/  orquestração                                 ← @Service, @Transactional
+adapter/      web (controllers, DTOs) e persistence (JDBC)
+config/
+```
+
+A regra é verificada por **teste de arquitetura** (ArchUnit): se alguém anotar uma classe de
+`domain`, o build quebra.
+
+### Alternativas consideradas
+
+**Package-by-layer** (`controller/`, `service/`, `repository/`). É o que todo tutorial de Spring
+mostra e qualquer dev Java reconhece de imediato — vantagem real, que não deve ser subestimada.
+Descartada porque colocaria o `FrameDecoder` dentro de `service/`, junto de classes anotadas.
+O teste de propriedade passaria a exigir contexto do Spring: segundos de bootstrap por execução,
+em vez de milissegundos. **Teste lento não fica lento — fica não executado.**
+
+**Hexagonal completa (ports & adapters).** Academicamente a mais correta. Descartada porque a
+cerimônia não se paga em cinco endpoints: cada operação passaria por três arquivos, e a resposta
+honesta a "por que essa indireção existe?" seria "porque o padrão manda" — a pior resposta
+possível numa entrevista.
+
+Manteve-se dela **só a parte que se paga**: a inversão entre `application` e `persistence`, que
+existe para testar o serviço sem banco. Cada indireção deste projeto tem um teste que a justifica.
+
+### Consequências
+
+**O decodificador fica testável em milissegundos**, sem framework em volta — que era o objetivo.
+
+**Uma camada a mais que o óbvio**, e um `IngestRequestDto` separado do `IngestBatch` de domínio.
+Conversão a mais para escrever; em troca, mudança no formato do JSON deixa de encostar no
+decodificador.
+
+**A regra precisa de fiscal.** Sem o teste de arquitetura ela dura até a primeira pressa. Custa
+uma dependência de teste e um arquivo — ver [`docs/07 §6`](07-arquitetura-do-codigo.md).
+
+---
+
+## ADR-010 · Aceitação parcial de lote
+
+**Status:** aceito
+
+### Contexto
+
+O cartão SD teve um bit invertido, ou o firmware montou um frame torto. Num lote de 1.000, **um**
+frame chega inválido — hex com número ímpar de dígitos, payload acima de 8 bytes, `canId` fora da
+faixa.
+
+O corpo é perfeitamente legível. Só um item dentro dele está corrompido.
+
+### Decisão
+
+**Aceitar os frames válidos e reportar os rejeitados**, com 200. A resposta traz
+`framesStored`, `framesRejected` e uma lista com índice e motivo de cada rejeição.
+
+Vale apenas para frames individuais dentro de um corpo legível. JSON que não parseia, ou lote sem
+`batchId`/`sessionId`, continua sendo 400 com o lote inteiro rejeitado — não há o que salvar.
+
+### Alternativa considerada
+
+**Tudo ou nada: rejeitar o lote inteiro com 400.** É mais simples de implementar e de raciocinar,
+e mantém a promessa de que um lote aceito está integralmente no servidor.
+
+Descartada porque cria um beco sem saída: **o firmware não tem como consertar aquele byte.** O
+frame já está gravado torto no cartão. As duas saídas seriam perder os 999 frames bons junto, ou
+retentar para sempre um lote que nunca vai passar — e retentar para sempre significa o buffer
+encher e a coleta parar. Um bit invertido derrubaria a telemetria do dia.
+
+### Consequências
+
+**O frame rejeitado é perdido, e isso é aceito.** O firmware apaga o buffer ao ver 2xx. O frame
+era ilegível de qualquer forma — mas a perda precisa ser **auditável**, não silenciosa.
+
+**Exige uma coluna nova:** `ingest_batch.rejected_count`, mais o conteúdo dos frames rejeitados no
+log. Sem isso, corrupção de cartão SD viraria perda gradual e invisível de dado.
+
+**Rejeição vira sinal de diagnóstico.** Se `rejected_count` começar a subir numa sessão, o
+problema é físico — cartão ruim, alimentação instável, ruído no barramento. O gráfico de
+rejeições por sessão é a ferramenta que denuncia isso, e é útil para a equipe de eletrônica
+independente do backend.
+
+**A resposta de sucesso fica mais rica** — o firmware precisa comparar `framesReceived` com
+`framesStored` em vez de só olhar o status. Custo pequeno, e o
+[`docs/08 §2.1`](08-contrato-de-erros.md) mantém a decisão do firmware simples.

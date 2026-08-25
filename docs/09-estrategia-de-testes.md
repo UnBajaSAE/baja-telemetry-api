@@ -1,0 +1,171 @@
+# 09 · Estratégia de testes
+
+**"Testes automatizados" é um dos gaps que este projeto existe para fechar.** Por isso a
+estratégia merece documento, não parágrafo — e por isso a regra do repositório é dura:
+**checkpoint sem teste não fecha.**
+
+---
+
+## 1. O que estamos protegendo
+
+Este sistema tem um modo de falha que quase nenhum CRUD tem: **erro no decodificador não gera
+exceção. Gera um número plausível e errado.**
+
+Endianness trocada, off-by-one no bit inicial, `signed` declarado como `unsigned` — nenhum deles
+levanta erro. Todos produzem um valor que parece perfeitamente razoável, é gravado, aparece no
+gráfico, e alguém toma decisão de engenharia em cima dele.
+
+Um teste que dá falsa confiança é pior que teste nenhum, porque desliga a desconfiança. É esse
+raciocínio que organiza tudo abaixo.
+
+---
+
+## 2. Os cinco níveis
+
+| Nível | Cobre | Ferramenta | Custo por execução |
+|---|---|---|---|
+| **Propriedade** | O decodificador: `encode(decode(x)) == x` | kotest-property | milissegundos |
+| **Unitário** | Parser DBC, validação, montagem de lote | JUnit 5 | milissegundos |
+| **Arquitetura** | A regra "`domain` não importa Spring" | ArchUnit | milissegundos |
+| **Integração** | Repositórios, batch insert, `ON CONFLICT`, hypertable | Testcontainers | segundos |
+| **Contrato** | `POST /ingest` de ponta a ponta, incluindo os erros | `@SpringBootTest` | segundos |
+| **Carga** | Throughput e latência sob pressão | Gerador sintético (ADR-005) | sob demanda |
+
+Os três primeiros rodam **sem subir nada**. Isso não é detalhe de conveniência — é o que
+permite rodá-los a cada salvamento de arquivo, e teste que roda a cada salvamento é teste que
+pega o erro no minuto em que ele nasce.
+
+---
+
+## 3. O teste de propriedade, explicado do zero
+
+### 3.1 A diferença
+
+Um **teste de exemplo** é você conferir três contas na calculadora: "se eu mandar `3E 80`, tem que
+sair 4.000 rpm". Ele prova que aquele caso funciona. Não prova nada sobre os outros 65.535.
+
+Um **teste de propriedade** é diferente: em vez de escolher os casos, você declara uma **regra que
+deve valer sempre**, e a biblioteca gera centenas ou milhares de entradas aleatórias tentando
+quebrá-la. Quando acha uma que quebra, ela ainda faz *shrinking* — reduz o contraexemplo até o
+menor caso que ainda falha, e te entrega isso em vez de um número aleatório gigante.
+
+A analogia mais próxima: teste de exemplo é conferir três medições; teste de propriedade é dizer
+*"a soma das forças num corpo em repouso tem que dar zero"* e mandar o computador tentar dez mil
+configurações procurando uma em que não dê.
+
+### 3.2 A propriedade do decodificador
+
+O decodificador tem uma inversa natural — o codificador, que é o que o firmware faz. Isso dá uma
+propriedade de ida e volta.
+
+**Propriedade 1 — exata.** Para *qualquer* padrão de bits que caiba na largura do sinal,
+decodificar e recodificar tem que devolver os mesmos bits:
+
+```
+encode(decode(bits)) == bits
+```
+
+Esta é a mais forte, porque é **igualdade exata** e cobre todo o espaço de entrada — inclusive os
+extremos que ninguém pensa em testar à mão: tudo zero, tudo um, o bit de sinal ligado sozinho.
+
+**Propriedade 2 — aproximada, e o "aproximada" é o ponto.** Partindo de um valor físico:
+
+```
+| decode(encode(valor)) − valor |  ≤  escala / 2
+```
+
+Não dá para exigir igualdade aqui, e entender por quê é entender a quantização: com escala 0,25,
+os valores representáveis são 0; 0,25; 0,50… Um RPM de 4.000,10 **não existe** no barramento —
+ao codificar, ele vira 4.000,00. A volta nunca vai devolver 4.000,10.
+
+O erro máximo é metade do passo de quantização. **Testar com `==` aqui daria um teste que falha
+sempre; testar com uma tolerância inventada daria um teste que passa sempre.** A tolerância certa
+sai da escala do próprio sinal, lida do DBC.
+
+### 3.3 Como fica
+
+```kotlin
+@Test
+fun `ida e volta preserva os bits, para qualquer padrao`() = runBlocking {
+    checkAll(Arb.int(0..0xFFFF)) { bitsBrutos ->
+        val sinal = dbc.signal(canId = 256, nome = "rpm")
+        val fisico = sinal.decode(bitsBrutos)
+        sinal.encode(fisico) shouldBe bitsBrutos
+    }
+}
+```
+
+Cada execução são centenas de casos. Se falhar, o relatório aponta o menor valor que quebra —
+e é aí que se descobre que o bit inicial estava um a mais.
+
+---
+
+## 4. Os casos que o decodificador é obrigado a passar
+
+O DBC provisório não tem três frames por acaso: cada um materializa uma armadilha do
+[`docs/01 §4`](01-dominio-can.md). **Nenhum checkpoint da Fase 2 fecha sem os três.**
+
+| Frame | O que exercita | O bug que pega |
+|---|---|---|
+| `0x100` MOTOR | Alinhado a byte, unsigned, big endian | Endianness trocada — o caso que já apareceu na documentação e virou 8.207,5 rpm |
+| `0x200` DINAMICA | `speed` de 12 bits + `gear` de 4, little endian | Off-by-one no bit inicial e máscara errada em sinal que cruza fronteira de byte |
+| `0x300` GPS | 32 bits **signed**, escala 1e-7 | `signed` tratado como `unsigned`: latitude do hemisfério sul viraria um número positivo enorme |
+
+Mais dois casos que não são de propriedade e sim de comportamento:
+
+**Fora de faixa vira `is_valid = false`, não exceção e não descarte.** Sensor desconectado manda
+`0xFF` em tudo. O ponto tem que ser **gravado e marcado**, porque saber que o sensor caiu às
+09:52 é informação, e um buraco no gráfico não distingue "sensor morreu" de "carro parado".
+
+**Diretiva DBC não suportada derruba a subida da aplicação.** O parser não pode pular linha em
+silêncio: ignorar um `SG_` desconhecido perde um sinal inteiro sem ninguém notar (ADR-006). O
+teste alimenta um DBC com `VAL_` e espera a exceção.
+
+---
+
+## 5. O teste de arquitetura
+
+A regra do [ADR-009](02-decisoes-tecnicas.md) — `domain` não importa framework — só sobrevive se
+tiver fiscal. Um teste ArchUnit quebra o build se alguém anotar uma classe de domínio por pressa,
+**inclusive o Claude numa sessão futura**. Está detalhado no
+[`docs/07 §6`](07-arquitetura-do-codigo.md).
+
+---
+
+## 6. Testcontainers sem pagar o preço duas vezes
+
+O [ADR-003](02-decisoes-tecnicas.md) já decidiu Postgres real em vez de H2. O risco prático é a
+suíte ficar tão lenta que ninguém rode.
+
+**A regra: um container para a suíte inteira, não um por classe de teste.** Em Spring Boot isso é
+uma classe base com o container em `companion object` e `@ServiceConnection`, ou o modo *reuse* do
+Testcontainers. Subir um Postgres por classe transformaria 20 classes em 20 bootstraps.
+
+**O schema vem do Flyway, não de `ddl-auto`.** O teste tem que exercitar exatamente as migrations
+que vão para produção — inclusive o `create_hypertable`. Um teste contra um schema gerado pelo
+framework testaria um banco que não existe em lugar nenhum.
+
+---
+
+## 7. O caminho de erro é teste de primeira classe
+
+Cada linha do catálogo do [`docs/08 §3`](08-contrato-de-erros.md) é um caso de teste — e o que se
+verifica **não é o código HTTP**, é o campo `retryable`.
+
+O raciocínio: um 503 que responde sem `retryable` faz o firmware apagar um buffer que deveria ter
+guardado. O dado some do cartão e nunca chegou ao servidor. **É a falha mais cara que este sistema
+pode ter, e ela mora no caminho de erro** — justamente a parte que a maioria dos projetos não
+testa.
+
+---
+
+## 8. O que deliberadamente não é testado
+
+**Que o Spring injeta dependência.** É o framework, não o nosso código.
+
+**Getters, setters e `data class`.** O compilador do Kotlin já garante.
+
+**Cobertura como meta numérica.** Perseguir 80% incentiva testar o que é fácil de testar — que é
+exatamente o encanamento — e deixa o decodificador de lado porque ele dá trabalho. A meta aqui é
+por área de risco, não por percentual: **o decodificador e o caminho de erro têm que estar
+cobertos**, e o resto segue o bom senso.

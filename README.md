@@ -5,7 +5,7 @@
 
 [![status](https://img.shields.io/badge/status-em%20desenvolvimento-orange)]()
 [![kotlin](https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&logoColor=white)]()
-[![spring](https://img.shields.io/badge/Spring%20Boot%203-6DB33F?logo=springboot&logoColor=white)]()
+[![spring](https://img.shields.io/badge/Spring%20Boot%204-6DB33F?logo=springboot&logoColor=white)]()
 [![postgres](https://img.shields.io/badge/PostgreSQL%20%2B%20TimescaleDB-4169E1?logo=postgresql&logoColor=white)]()
 
 ---
@@ -55,9 +55,9 @@ Somando os quatro nós, a ordem de grandeza é de **~500 mensagens por segundo**
 
 | Camada | Escolha | Motivo resumido |
 |---|---|---|
-| Linguagem | Kotlin (JVM) | Null safety no compilador, interop total com o ecossistema Java |
-| Framework | Spring Boot 3 | Padrão de mercado na JVM |
-| Banco | PostgreSQL + TimescaleDB | Série temporal com particionamento automático por tempo |
+| Linguagem | Kotlin 2.4 (JDK 25) | Null safety no compilador, interop total com o ecossistema Java |
+| Framework | Spring Boot 4.1 | Padrão de mercado na JVM. Linha 4 por ser a estável atual — trade-off em `docs/11 §1.1` |
+| Banco | PostgreSQL 17 + TimescaleDB | Série temporal com particionamento automático por tempo |
 | Migrations | Flyway | Schema versionado em git, nunca `ddl-auto` |
 | Testes | JUnit 5 + Testcontainers | Postgres real no teste, não banco em memória |
 | Container | Docker (multi-stage) | Build Gradle → runtime JRE slim |
@@ -69,12 +69,25 @@ As justificativas completas estão em [`docs/02-decisoes-tecnicas.md`](docs/02-d
 
 | Documento | Conteúdo |
 |---|---|
+| 🚩 [**`docs/13-o-caminho-de-um-lote.md`**](docs/13-o-caminho-de-um-lote.md) | **Comece por aqui.** O sistema inteiro em diagramas: do cartão SD ao banco, e de volta |
 | [`docs/01-dominio-can.md`](docs/01-dominio-can.md) | O que é um frame CAN, como um byte cru vira grandeza física, o que é DBC |
 | [`docs/02-decisoes-tecnicas.md`](docs/02-decisoes-tecnicas.md) | Decisões de arquitetura com justificativa (formato ADR) |
 | [`docs/03-protocolo-ingestao.md`](docs/03-protocolo-ingestao.md) | Contrato entre o ESP32 e a API: lote, idempotência, dado fora de ordem |
+| [`docs/04-glossario.md`](docs/04-glossario.md) | Jargão do domínio e da stack |
+| [`docs/05-mapa-de-sinais.md`](docs/05-mapa-de-sinais.md) | O que é um DBC, por que existe, e como decodificar uma linha de sinal |
+| [`docs/06-modelo-de-dados.md`](docs/06-modelo-de-dados.md) | Schema, hypertables e índices — com os números medidos de uma sessão real |
+| [`docs/07-arquitetura-do-codigo.md`](docs/07-arquitetura-do-codigo.md) | Estrutura de pacotes e o fluxo de um `POST /ingest` passo a passo |
+| [`docs/08-contrato-de-erros.md`](docs/08-contrato-de-erros.md) | **Para o firmware:** o catálogo de erros e quando retentar |
+| [`docs/09-estrategia-de-testes.md`](docs/09-estrategia-de-testes.md) | Que nível testa o quê, e o teste de propriedade do decodificador |
+| [`docs/10-requisitos-nao-funcionais.md`](docs/10-requisitos-nao-funcionais.md) | Números-alvo, cada um derivado ou medido |
+| [`docs/11-ambiente-e-setup.md`](docs/11-ambiente-e-setup.md) | Versões fixadas, compose comentado, como rodar |
+| [`docs/12-plano-de-fases.md`](docs/12-plano-de-fases.md) | **Mapa de progresso** — cada fase quebrada em checkpoints com critério de aceitação |
 
 ## Roadmap
 
+Progresso detalhado, checkpoint a checkpoint, em [`docs/12-plano-de-fases.md`](docs/12-plano-de-fases.md).
+
+- [x] **Fase 0 — Fundação documental.** Domínio, modelo de dados, arquitetura, contratos e requisitos decididos antes do código
 - [ ] **Fase 1 — Esqueleto.** Spring Boot + Kotlin, `POST /ingest`, Postgres via compose, primeiro teste com Testcontainers, gerador de dados sintéticos
 - [ ] **Fase 2 — Modelo de dados.** Flyway, hypertable, batch insert, decodificador de frame
 - [ ] **Fase 3 — Consulta.** Agregação por janela de tempo, paginação por cursor

@@ -1,0 +1,61 @@
+VERSION "0.1-PROVISORIO"
+
+
+NS_ :
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_DEF_REL_
+	BA_REL_
+	BA_DEF_DEF_REL_
+	BU_SG_REL_
+	BU_EV_REL_
+	BU_BO_REL_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_: ECU_MOTOR ECU_DINAMICA ECU_GPS TELEMETRIA
+
+
+BO_ 256 MOTOR: 8 ECU_MOTOR
+ SG_ rpm : 7|16@0+ (0.25,0) [0|8000] "rpm" TELEMETRIA
+ SG_ temp : 23|8@0+ (1,-40) [-40|215] "degC" TELEMETRIA
+
+BO_ 512 DINAMICA: 8 ECU_DINAMICA
+ SG_ speed : 0|12@1+ (0.1,0) [0|150] "km/h" TELEMETRIA
+ SG_ gear : 12|4@1+ (1,0) [0|5] "" TELEMETRIA
+
+BO_ 768 GPS: 8 ECU_GPS
+ SG_ lat : 7|32@0- (0.0000001,0) [-90|90] "deg" TELEMETRIA
+ SG_ lon : 39|32@0- (0.0000001,0) [-180|180] "deg" TELEMETRIA
+
+
+CM_ "PROVISORIO - valores ficticios, gerados para destravar o desenvolvimento. NAO refletem o firmware real da UnBaja. Ver docs/05-mapa-de-sinais.md para o procedimento de levantamento.";
+CM_ BO_ 256 "Caso base do decodificador: sinais alinhados a byte, unsigned, big endian.";
+CM_ SG_ 256 rpm "Escala 0.25 para ganhar resolucao na faixa util (0 a 16383 rpm em passos de 0.25).";
+CM_ SG_ 256 temp "Offset -40 para cobrir temperatura negativa sem gastar bit de sinal.";
+CM_ BO_ 512 "Caso 2: sinais que NAO se alinham a fronteira de byte, e little endian.";
+CM_ SG_ 512 speed "12 bits: ocupa o byte 0 inteiro mais o nibble baixo do byte 1.";
+CM_ SG_ 512 gear "4 bits: nibble alto do byte 1. Exige mascara, nao fatiamento de array.";
+CM_ BO_ 768 "Caso 3: signed em complemento de dois, 32 bits, escala fracionaria pequena.";
+CM_ SG_ 768 lat "Signed: hemisferio sul e negativo. 32 bits com escala 1e-7 cobre +-214 graus.";
+CM_ SG_ 768 lon "Signed: oeste de Greenwich e negativo. Brasilia fica em lon negativa.";

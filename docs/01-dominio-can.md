@@ -165,12 +165,33 @@ Um trecho de DBC é assim:
 
 ```
 BO_ 256 MOTOR: 8 ECU_MOTOR
- SG_ rpm  : 0|16@1+ (0.25,0)  [0|8000]  "rpm" Telemetria
- SG_ temp : 16|8@1+ (1,-40)   [-40|215] "degC" Telemetria
+ SG_ rpm  : 7|16@0+ (0.25,0)  [0|8000]  "rpm" TELEMETRIA
+ SG_ temp : 23|8@0+ (1,-40)   [-40|215] "degC" TELEMETRIA
 ```
 
-Traduzindo a linha do RPM: começa no bit 0, tem 16 bits de largura, `@1+` é a notação de
-byte order e de ser unsigned, `(0.25,0)` é escala e offset, `[0|8000]` é a faixa válida.
+Traduzindo a linha do RPM, campo a campo:
+
+| Trecho | Significado |
+|---|---|
+| `7` | Bit inicial |
+| `16` | Largura em bits |
+| `@0` | **Big endian** (Motorola). `@1` seria little endian (Intel) |
+| `+` | Unsigned. `-` seria signed, em complemento de dois |
+| `(0.25,0)` | Escala e offset |
+| `[0\|8000]` | Faixa válida |
+| `"rpm"` | Unidade |
+| `TELEMETRIA` | Nó que consome o sinal |
+
+**Duas pegadinhas da notação**, e as duas produzem exatamente o erro silencioso da seção 4:
+
+**A numeração da endianness é invertida em relação à intuição.** `@0` é big endian e `@1` é
+little endian — o zero é o Motorola, o um é o Intel. Trocar os dois neste frame faz o payload
+`3E 80` virar 8.207,5 rpm em vez de 4.000, sem nenhum erro ser levantado.
+
+**O bit inicial muda de significado conforme a endianness.** Em big endian ele aponta o bit
+**mais significativo** do sinal; em little endian, o **menos** significativo. É por isso que o
+RPM começa no bit 7 e não no bit 0: o bit 7 é o MSB do byte 0. O detalhamento está em
+[`docs/05-mapa-de-sinais.md`](05-mapa-de-sinais.md).
 
 **Você quase certamente já tem essa informação** — só que espalhada no firmware, em `#define` e
 em `struct`, em vez de num arquivo. Consolidá-la é o primeiro passo real do projeto, e traz um

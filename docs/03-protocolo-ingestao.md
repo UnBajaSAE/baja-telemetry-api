@@ -39,7 +39,7 @@ X-API-Key: <chave do dispositivo>
 |---|---|---|
 | `batchId` | UUID | Gerado pelo dispositivo. **Chave de idempotência** |
 | `deviceId` | string | Qual dos nós enviou |
-| `sessionId` | string | Agrupa uma sessão de teste ou prova |
+| `sessionId` | string | Agrupa uma sessão de teste ou prova. **Gerado pelo dispositivo**, formato `AAAA-MM-DD-slug` ([ADR-007](02-decisoes-tecnicas.md)) |
 | `frames[].t` | epoch ms | Horário **da leitura no dispositivo**, não do envio |
 | `frames[].id` | int | Identificador CAN (`0x100` = 256) |
 | `frames[].data` | hex | Payload, 1 a 8 bytes |
@@ -53,6 +53,19 @@ X-API-Key: <chave do dispositivo>
 Lote já processado responde **200** com `"duplicate": true` — não 409. Do ponto de vista do
 cliente o resultado é o mesmo (o dado está lá), e devolver erro faria o firmware tentar
 "consertar" algo que já está certo.
+
+Frames individuais inválidos **não derrubam o lote** — os válidos entram e os rejeitados são
+reportados ([ADR-010](02-decisoes-tecnicas.md)):
+
+```json
+{ "batchId": "550e8400-…", "framesReceived": 1000, "framesStored": 999,
+  "framesRejected": 1, "duplicate": false,
+  "rejections": [ { "index": 447, "reason": "malformed-frame", "detail": "…" } ] }
+```
+
+> **O catálogo completo de erros — e, mais importante, quando o firmware deve retentar e quando
+> deve apagar o buffer — está em [`docs/08-contrato-de-erros.md`](08-contrato-de-erros.md).**
+> É a referência do lado do firmware.
 
 ### Limites
 
@@ -98,6 +111,19 @@ loop:
 **O ponto crítico:** em caso de falha, reenviar com o **mesmo** `batchId`. Gerar um novo a cada
 tentativa destrói a idempotência e duplica dados.
 
+### Dois requisitos de persistência no cartão SD
+
+Ambos saem do [ADR-008](02-decisoes-tecnicas.md) e valem a pena por escrito, porque não se deduzem
+lendo só a API — são do lado do firmware:
+
+| O que gravar no SD | Por que não basta em memória |
+|---|---|
+| O **`batchId`**, junto com o buffer que ele identifica | O ESP32 reinicia. Se o id for regenerado, o mesmo dado volta com id novo, a proteção de idempotência não reconhece, e duplica |
+| O **`sessionId`** corrente | Mesmo motivo: reinício no meio da coleta não pode fatiar a sessão em duas ([ADR-007](02-decisoes-tecnicas.md)) |
+
+> A idempotência da API é forte para reenvio, e **depende** dessas duas gravações para cobrir
+> reinício. Sem elas, existe um cenário de duplicação que o backend não tem como detectar.
+
 ---
 
 ## Endpoints de consulta (Fase 3)
@@ -119,7 +145,10 @@ ao ponto.
 
 ## Em aberto
 
-- [ ] Consolidar o mapa de sinais do firmware num arquivo DBC — pré-requisito do decodificador
-- [ ] Definir se `sessionId` é criado pelo dispositivo ou pela API
-- [ ] Estratégia de correção de deriva do relógio do ESP32
-- [ ] Rotação de API key por dispositivo
+- [x] ~~Consolidar o mapa de sinais num arquivo DBC~~ — feito, [`docs/05`](05-mapa-de-sinais.md).
+      O arquivo existe e é válido; os **valores** ainda são fictícios até o levantamento do firmware
+- [x] ~~Definir se `sessionId` é criado pelo dispositivo ou pela API~~ — **dispositivo**, [ADR-007](02-decisoes-tecnicas.md)
+- [ ] Estratégia de correção de deriva do relógio do ESP32 — o schema já guarda os dois relógios
+      ([`docs/06 §2`](06-modelo-de-dados.md)); falta o algoritmo
+- [ ] Rotação de API key por dispositivo — Fase 4
+- [x] ~~Catálogo de erros e comportamento de retentativa~~ — [`docs/08`](08-contrato-de-erros.md)
