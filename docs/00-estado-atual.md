@@ -3,7 +3,7 @@
 > **Atualize este arquivo ao fechar cada checkpoint.** É o primeiro que o Claude lê ao
 > retomar o trabalho, e o que evita recomeçar o contexto do zero a cada sessão.
 
-**Última atualização:** 24/08/2026
+**Última atualização:** 25/08/2026 — Fase 0 fechada
 
 ---
 
@@ -36,13 +36,13 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 - [x] `docs/06` — modelo de dados, verificado contra um TimescaleDB real
 - [x] `docs/07` — arquitetura de pacotes, com o fluxo de um POST passo a passo
 - [x] `docs/08` — catálogo de erros e quando o firmware retenta
-- [x] `contracts/openapi.yaml` — validado com `openapi-spec-validator`
-- [x] `docs/12` — mapa de checkpoints de todas as fases
 - [x] `docs/09` — estratégia de testes, com o teste de propriedade explicado
 - [x] `docs/10` — requisitos não-funcionais, derivados ou **medidos**
 - [x] `docs/11` — versões fixadas (JDK 25 · Kotlin 2.4.10 · Spring Boot 4.1.1 · PG 17)
-- [x] `docs/13` — o caminho de um lote, em diagramas (porta de entrada do repo)
+- [x] `docs/12` — mapa de checkpoints de todas as fases
+- [x] `docs/13` — o caminho de um lote, em diagramas (**porta de entrada do repo**)
 - [x] `contracts/can/unbaja.dbc` — DBC **provisório**, validado com `cantools`
+- [x] `contracts/openapi.yaml` — validado com `openapi-spec-validator`
 - [x] `CLAUDE.md` e 4 skills em `.claude/skills/`
 
 ## O que NÃO existe ainda
