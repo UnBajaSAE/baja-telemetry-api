@@ -66,8 +66,34 @@ Antes de começar, ler [`docs/11`](11-ambiente-e-setup.md) (versões fixadas: JD
 2.4.10 · Spring Boot 4.1.1) e [`docs/07 §2`](07-arquitetura-do-codigo.md) (onde cada arquivo mora).
 O plano completo da fase está em [`docs/12`](12-plano-de-fases.md).
 
-> **Pré-requisito de máquina:** JDK 25 e Docker instalados. Docker **não é opcional** — os testes
-> sobem containers de verdade (ADR-003).
+> **Pré-requisito de máquina — verificado em 08/09/2026:**
+>
+> | | Estado |
+> |---|---|
+> | **JDK 25** | ❌ **ausente** — nenhum `java` no PATH |
+> | Docker (daemon) | ✅ instalado e ativo (29.7.2) |
+> | **Docker (acesso do usuário)** | ❌ **`permission denied` no socket** |
+>
+> **As duas pendências travam a Fase 1**, e a segunda é a menos óbvia: o daemon está rodando, mas
+> o usuário `heitor` não pertence ao grupo `docker`, então todo comando falha com
+> `permission denied while trying to connect to the docker API at unix:///var/run/docker.sock`.
+> Isso funcionava em 25/08 e parou depois que o socket foi recriado em 05/09.
+>
+> Como o [ADR-003](02-decisoes-tecnicas.md) escolheu Testcontainers, **os testes não rodam sem
+> isso** — nem localmente, nem no CI.
+>
+> ```bash
+> # 1. JDK 25 (uma das duas)
+> mise use -g java@25            # mise ja e usado nesta maquina para o node
+> sudo pacman -S jdk25-openjdk   # ou pelo repo do Arch (25.0.4.1.u1-1)
+>
+> # 2. acesso ao Docker sem sudo
+> sudo usermod -aG docker heitor
+> newgrp docker                  # ou fazer logout/login para valer na sessao inteira
+>
+> # 3. conferir
+> java -version && docker run --rm hello-world
+> ```
 
 ### Pendência paralela do Heitor: levantar os sinais reais
 
@@ -91,7 +117,7 @@ numeração de bit o firmware usa** — a conversão para a do DBC é mecânica,
 | Correção de deriva do relógio do ESP32 | schema já guarda os dois relógios; falta o algoritmo |
 | `session_id`/`signal_name` como `TEXT` incham os índices (medido: 731 MB) | **revisar na Fase 5** com o gerador realista ([`docs/06 §8.4`](06-modelo-de-dados.md)) |
 | O índice composto rende só 1,4× — medido com **uma só sessão** no banco | remedir na Fase 5 com a temporada inteira ([`docs/10 §2.3`](10-requisitos-nao-funcionais.md)) |
-| Catálogo de erros e retentativa do firmware | checkpoint 0.3 |
+| Catálogo de erros e retentativa do firmware | ✅ **fechado** ([`docs/08`](08-contrato-de-erros.md)) |
 | Hospedagem: o Postgres gerenciado escolhido suporta TimescaleDB? | **verificar antes da Fase 5** |
 | Rotação de API key por dispositivo | em aberto |
 
