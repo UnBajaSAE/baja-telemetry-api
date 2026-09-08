@@ -72,23 +72,26 @@ O plano completo da fase está em [`docs/12`](12-plano-de-fases.md).
 > |---|---|
 > | **JDK 25** | ✅ **resolvido** — Temurin 25.0.4.1+1 LTS, via `mise`, global |
 > | Docker (daemon) | ✅ instalado e ativo (29.7.2) |
-> | **Docker (acesso do usuário)** | ⏳ **pendente — exige `sudo`** |
+> | Docker (grupo do usuário) | ✅ `usermod -aG docker` aplicado — `Hello from Docker!` confirmado |
+> | **Sessão gráfica** | ⏳ **precisa de logout/login** — ver abaixo |
 >
 > O JDK foi instalado com `mise use -g java@temurin-25.0.4+101.0.LTS` (corresponde ao release
 > `jdk-25.0.4.1+1` da Adoptium) e já responde em shell de login limpo, pelos shims do mise.
 >
-> **A pendência que resta é a menos óbvia:** o daemon do Docker está rodando, mas o usuário
-> `heitor` não pertence ao grupo `docker`, então todo comando falha com
-> `permission denied while trying to connect to the docker API at unix:///var/run/docker.sock`.
-> Funcionava em 25/08 e parou depois que o socket foi recriado em 05/09.
+> **A pendência que resta não é mais permissão, é propagação.** O `usermod` foi aplicado e o
+> `/etc/group` já traz `docker:x:967:heitor` — mas **grupos são credenciais de processo, lidas na
+> criação**. A sessão gráfica atual (Hyprland) subiu antes da mudança e carrega
+> `Groups: 984 998 1000`, sem o gid 967 do docker. Todo terminal aberto a partir dela herda isso.
 >
-> Como o [ADR-003](02-decisoes-tecnicas.md) escolheu Testcontainers, **nenhum teste roda sem
-> isso.**
+> Consequência prática: `newgrp docker` funciona pontualmente, mas **não resolve para o Gradle** —
+> quando ele subir os Testcontainers do [ADR-003](02-decisoes-tecnicas.md), os processos filhos
+> herdarão as credenciais antigas e o socket vai recusar.
+>
+> **Fazer logout/login (ou reiniciar) uma vez, antes de começar a Fase 1.** Depois disso vale para
+> todo terminal, para o Gradle e para o Claude Code.
 >
 > ```bash
-> sudo usermod -aG docker $USER
-> newgrp docker                  # ou logout/login, para valer em toda a sessao
-> docker run --rm hello-world    # confirmacao
+> docker run --rm hello-world    # confirmacao, ja sem newgrp
 > ```
 >
 > ⚠️ Estar no grupo `docker` equivale, na prática, a ter root — quem acessa o socket pode montar
