@@ -70,30 +70,30 @@ O plano completo da fase está em [`docs/12`](12-plano-de-fases.md).
 >
 > | | Estado |
 > |---|---|
-> | **JDK 25** | ❌ **ausente** — nenhum `java` no PATH |
+> | **JDK 25** | ✅ **resolvido** — Temurin 25.0.4.1+1 LTS, via `mise`, global |
 > | Docker (daemon) | ✅ instalado e ativo (29.7.2) |
-> | **Docker (acesso do usuário)** | ❌ **`permission denied` no socket** |
+> | **Docker (acesso do usuário)** | ⏳ **pendente — exige `sudo`** |
 >
-> **As duas pendências travam a Fase 1**, e a segunda é a menos óbvia: o daemon está rodando, mas
-> o usuário `heitor` não pertence ao grupo `docker`, então todo comando falha com
+> O JDK foi instalado com `mise use -g java@temurin-25.0.4+101.0.LTS` (corresponde ao release
+> `jdk-25.0.4.1+1` da Adoptium) e já responde em shell de login limpo, pelos shims do mise.
+>
+> **A pendência que resta é a menos óbvia:** o daemon do Docker está rodando, mas o usuário
+> `heitor` não pertence ao grupo `docker`, então todo comando falha com
 > `permission denied while trying to connect to the docker API at unix:///var/run/docker.sock`.
-> Isso funcionava em 25/08 e parou depois que o socket foi recriado em 05/09.
+> Funcionava em 25/08 e parou depois que o socket foi recriado em 05/09.
 >
-> Como o [ADR-003](02-decisoes-tecnicas.md) escolheu Testcontainers, **os testes não rodam sem
-> isso** — nem localmente, nem no CI.
+> Como o [ADR-003](02-decisoes-tecnicas.md) escolheu Testcontainers, **nenhum teste roda sem
+> isso.**
 >
 > ```bash
-> # 1. JDK 25 (uma das duas)
-> mise use -g java@25            # mise ja e usado nesta maquina para o node
-> sudo pacman -S jdk25-openjdk   # ou pelo repo do Arch (25.0.4.1.u1-1)
->
-> # 2. acesso ao Docker sem sudo
-> sudo usermod -aG docker heitor
-> newgrp docker                  # ou fazer logout/login para valer na sessao inteira
->
-> # 3. conferir
-> java -version && docker run --rm hello-world
+> sudo usermod -aG docker $USER
+> newgrp docker                  # ou logout/login, para valer em toda a sessao
+> docker run --rm hello-world    # confirmacao
 > ```
+>
+> ⚠️ Estar no grupo `docker` equivale, na prática, a ter root — quem acessa o socket pode montar
+> `/` dentro de um container. É a troca padrão numa máquina de desenvolvimento, e a alternativa
+> (Docker rootless) complica a configuração do Testcontainers sem ganho aqui.
 
 ### Pendência paralela do Heitor: levantar os sinais reais
 
