@@ -3,11 +3,13 @@
 > **Atualize este arquivo ao fechar cada checkpoint.** É o primeiro que o Claude lê ao
 > retomar o trabalho, e o que evita recomeçar o contexto do zero a cada sessão.
 
-**Última atualização:** 10/09/2026 — **Fase 1 completa**
+**Última atualização:** 10/09/2026 — checkpoint 2.1 fechado
 
 ---
 
 ## Fase atual
+
+**🔵 Fase 2 — Modelo de dados e decodificador (1/6).** O schema começou a existir de verdade.
 
 **✅ Fase 1 — Esqueleto: COMPLETA (5/5).** A API sobe, o banco roda no Compose, e o `/ingest` já aceita o contrato — mas **ainda não grava nada**.
 
@@ -55,6 +57,7 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 - [x] **Testcontainers** — PostgreSQL 17 + TimescaleDB real na suíte, **um container para a suíte**
 - [x] **Gerador sintético** (`./gradlew gerador`) — 111 frames/s, curvas verificadas com `cantools`
 - [x] **`FrameEncoder`** no domínio — bate byte a byte com o `cantools` nos três frames
+- [x] **Flyway** — `session`, `ingest_batch` e `signal_definition` existem no banco (V1 e V2)
 
 ## O que NÃO existe ainda
 
@@ -69,26 +72,25 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 
 ## Próximo passo
 
-**Fase 2 — modelo de dados e decodificador.** É o coração do sistema: é aqui que erro não gera
-exceção, gera dado silenciosamente errado.
+**Checkpoint 2.2 — `raw_frame` como hypertable.**
 
-**Checkpoint 2.1 — Flyway e primeiras tabelas.**
+**Aceite:** `SELECT * FROM timescaledb_information.chunks` mostra chunks criados após inserir
+dado que cruze a janela configurada de 1 dia.
 
-**Aceite:** `flyway_schema_history` mostra a V1 aplicada, e subir a aplicação duas vezes não
-reaplica migration.
+O DDL já está escrito e verificado em [`docs/06 §3.3`](06-modelo-de-dados.md), com as três
+surpresas do TimescaleDB documentadas: hypertable não aceita chave primária que não inclua a
+coluna de tempo, chave estrangeira custa uma verificação por linha inserida, e o tamanho do
+chunk é decisão de projeto.
 
-O schema alvo já está escrito e **verificado contra um TimescaleDB real** em
-[`docs/06`](06-modelo-de-dados.md) — é transformar aquele DDL em migrations numeradas.
-
-> ⚠️ **O `/ingest` ainda responde 2xx sem persistir** (`framesStored: 0`). Não apontar firmware
-> real para ele até o checkpoint 2.5. O gerador sintético avisa isso na saída.
+> ⚠️ **O `/ingest` ainda responde 2xx sem persistir.** Não apontar firmware real para ele até o
+> checkpoint 2.5.
 
 ### Como rodar o que já existe
 
 ```bash
-docker compose up -d                       # sobe o banco (o health depende dele)
-./gradlew bootRun                          # sobe a API na 8081
-./gradlew test                             # 34 testes, 1 container
+docker compose up -d                       # sobe o banco
+./gradlew bootRun                          # sobe a API na 8081 (aplica as migrations)
+./gradlew test                             # 39 testes
 ./gradlew gerador                          # telemetria sintetica por 60s
 ```
 

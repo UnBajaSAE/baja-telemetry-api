@@ -25,6 +25,12 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
 	implementation("org.springframework.boot:spring-boot-starter-jdbc")
+	// Schema versionado em git, nunca ddl-auto.
+	// No Spring Boot 3 bastava o flyway-core no classpath; na linha 4 a
+	// autoconfiguracao foi para um modulo proprio, entregue por este starter.
+	// E desde o Flyway 10 o suporte a cada banco vem separado do core.
+	implementation("org.springframework.boot:spring-boot-starter-flyway")
+	runtimeOnly("org.flywaydb:flyway-database-postgresql")
 	runtimeOnly("org.postgresql:postgresql")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	implementation("tools.jackson.module:jackson-module-kotlin")

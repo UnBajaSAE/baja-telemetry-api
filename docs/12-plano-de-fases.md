@@ -19,7 +19,7 @@ profundidade, não na quantidade de features.
 |---|---|---|---|
 | **0** | Fundação documental | 5 | ✅ **5/5** |
 | **1** | Esqueleto — sobe, recebe, testa | 5 | ✅ **5/5** |
-| **2** | Modelo de dados e decodificador | 6 | ⬜ 0/6 |
+| **2** | Modelo de dados e decodificador | 6 | 🔵 1/6 |
 | **3** | Consulta | 4 | ⬜ 0/4 |
 | **4** | Robustez | 5 | ⬜ 0/5 |
 | **5** | Deploy e medição | 4 | ⬜ 0/4 |
@@ -140,9 +140,13 @@ telemetria sem o carro. **Nada é persistido ainda** — é o que a Fase 2 resol
 
 *O coração do sistema. É aqui que erro não gera exceção, gera dado silenciosamente errado.*
 
-### ⬜ 2.1 · Flyway e primeiras tabelas
-**Aceite:** `flyway_schema_history` mostra a V1 aplicada; subir a aplicação duas vezes não
-reaplica migration.
+### ✅ 2.1 · Flyway e primeiras tabelas
+**Aceite:** as duas metades verificadas contra o banco do Compose. A primeira subida aplicou
+`V1__extensao_timescaledb` e `V2__tabelas_base`; a segunda respondeu
+*"Schema public is up to date. No migration necessary."*
+**Fechado em 10/09/2026.** Cinco testes novos, incluindo a prova de que a chave primária de
+`ingest_batch` recusa o mesmo `batchId` duas vezes — a idempotência do ADR-008 é do banco, não
+de checagem no código. As hypertables entram na 2.2.
 
 ### ⬜ 2.2 · `raw_frame` como hypertable
 **Aceite:** `SELECT * FROM timescaledb_information.chunks` mostra chunks criados após inserir

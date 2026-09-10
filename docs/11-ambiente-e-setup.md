@@ -46,6 +46,11 @@ de linha, não o próprio código.
 | `com.fasterxml.jackson.module:jackson-module-kotlin` | `tools.jackson.module:jackson-module-kotlin` (Jackson 3) |
 | `org.testcontainers:postgresql` (Testcontainers 1.x) | `org.testcontainers:testcontainers-postgresql` (2.x — os módulos ganharam prefixo) |
 | `PostgreSQLContainer<*>` — a classe era genérica | `PostgreSQLContainer` — deixou de ser, na 2.x |
+| `flyway-core` no classpath bastava | precisa de `spring-boot-starter-flyway` — a autoconfiguração virou módulo próprio |
+
+> A do Flyway é a mais traiçoeira das quatro: **nada quebra na compilação**. A aplicação sobe
+> normalmente, o Flyway está no classpath, e simplesmente ninguém o aciona. O sintoma é
+> `relation "session" does not exist` na primeira consulta — que parece erro de SQL.
 
 Nenhum deles quebra em runtime — **quebram na compilação**, que é o lugar barato de descobrir.
 
