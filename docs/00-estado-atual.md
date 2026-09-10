@@ -3,13 +3,13 @@
 > **Atualize este arquivo ao fechar cada checkpoint.** É o primeiro que o Claude lê ao
 > retomar o trabalho, e o que evita recomeçar o contexto do zero a cada sessão.
 
-**Última atualização:** 10/09/2026 — checkpoint 1.4 fechado
+**Última atualização:** 10/09/2026 — **Fase 1 completa**
 
 ---
 
 ## Fase atual
 
-**🔵 Fase 1 — Esqueleto (4/5).** A API sobe, o banco roda no Compose, e o `/ingest` já aceita o contrato — mas **ainda não grava nada**.
+**✅ Fase 1 — Esqueleto: COMPLETA (5/5).** A API sobe, o banco roda no Compose, e o `/ingest` já aceita o contrato — mas **ainda não grava nada**.
 
 **✅ Fase 0 — Fundação documental: COMPLETA.** As decisões de domínio, dados, arquitetura,
 contratos e qualidade estão registradas, e as verificáveis foram verificadas contra ferramenta
@@ -52,7 +52,9 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 - [x] **`POST /api/v1/ingest`** validando o contrato, com Problem Details e `retryable`
 - [x] Domínio puro (`CanFrame`, `SessionId`) — 15 testes em **0,04 s**, sem Spring
 - [x] Teste de arquitetura (ArchUnit) fiscalizando o ADR-009
-- [x] **Testcontainers** — PostgreSQL 17 + TimescaleDB real na suíte, **um container para os 27 testes**
+- [x] **Testcontainers** — PostgreSQL 17 + TimescaleDB real na suíte, **um container para a suíte**
+- [x] **Gerador sintético** (`./gradlew gerador`) — 111 frames/s, curvas verificadas com `cantools`
+- [x] **`FrameEncoder`** no domínio — bate byte a byte com o `cantools` nos três frames
 
 ## O que NÃO existe ainda
 
@@ -67,23 +69,27 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 
 ## Próximo passo
 
-**Checkpoint 1.5 — gerador de dados sintéticos.** Último da Fase 1.
+**Fase 2 — modelo de dados e decodificador.** É o coração do sistema: é aqui que erro não gera
+exceção, gera dado silenciosamente errado.
 
-Não é extra, é **pré-requisito** ([ADR-005](02-decisoes-tecnicas.md)): o carro não fica
-disponível para desenvolvimento, não está no laboratório de madrugada, e não está rodando quando
-o CI executa. Sem o gerador, nada é desenvolvível nem demonstrável.
+**Checkpoint 2.1 — Flyway e primeiras tabelas.**
 
-**Aceite:** o gerador alimenta o `/ingest` por 60 s sem o carro presente — com curva de RPM
-plausível, temperatura subindo com o uso e GPS percorrendo um traçado. E sabe simular queda de
-conexão com reenvio do **mesmo** `batchId`, que é o cenário que o ADR-008 protege.
+**Aceite:** `flyway_schema_history` mostra a V1 aplicada, e subir a aplicação duas vezes não
+reaplica migration.
+
+O schema alvo já está escrito e **verificado contra um TimescaleDB real** em
+[`docs/06`](06-modelo-de-dados.md) — é transformar aquele DDL em migrations numeradas.
+
+> ⚠️ **O `/ingest` ainda responde 2xx sem persistir** (`framesStored: 0`). Não apontar firmware
+> real para ele até o checkpoint 2.5. O gerador sintético avisa isso na saída.
 
 ### Como rodar o que já existe
 
 ```bash
 docker compose up -d                       # sobe o banco (o health depende dele)
-./gradlew bootRun                          # sobe a API
-curl localhost:8081/actuator/health        # {"status":"UP"}
-./gradlew test                             # 27 testes, sobe 1 container
+./gradlew bootRun                          # sobe a API na 8081
+./gradlew test                             # 34 testes, 1 container
+./gradlew gerador                          # telemetria sintetica por 60s
 ```
 
 ### Pendência paralela do Heitor: levantar os sinais reais

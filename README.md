@@ -89,7 +89,7 @@ As justificativas completas estão em [`docs/02-decisoes-tecnicas.md`](docs/02-d
 Progresso detalhado, checkpoint a checkpoint, em [`docs/12-plano-de-fases.md`](docs/12-plano-de-fases.md).
 
 - [x] **Fase 0 — Fundação documental.** Domínio, modelo de dados, arquitetura, contratos e requisitos decididos antes do código
-- [ ] **Fase 1 — Esqueleto.** Spring Boot + Kotlin, `POST /ingest`, Postgres via compose, primeiro teste com Testcontainers, gerador de dados sintéticos
+- [x] **Fase 1 — Esqueleto.** Spring Boot + Kotlin, `POST /ingest`, Postgres via compose, primeiro teste com Testcontainers, gerador de dados sintéticos
 - [ ] **Fase 2 — Modelo de dados.** Flyway, hypertable, batch insert, decodificador de frame
 - [ ] **Fase 3 — Consulta.** Agregação por janela de tempo, paginação por cursor
 - [ ] **Fase 4 — Robustez.** API key, rate limiting, validação, Problem Details (RFC 7807), Actuator
@@ -97,7 +97,16 @@ Progresso detalhado, checkpoint a checkpoint, em [`docs/12-plano-de-fases.md`](d
 
 ## Como rodar
 
-> Ainda não implementado — será `docker compose up` a partir da Fase 1.
+```bash
+docker compose up -d                    # Postgres 17 + TimescaleDB
+./gradlew bootRun                       # a API, na porta 8081
+curl localhost:8081/actuator/health     # {"status":"UP"}
+
+./gradlew test                          # 34 testes, com Postgres real
+./gradlew gerador                       # telemetria sintética, sem o carro
+```
+
+Pré-requisitos e versões em [`docs/11`](docs/11-ambiente-e-setup.md).
 
 ## Equipe
 

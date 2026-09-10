@@ -195,6 +195,27 @@ E os testes:
 ./gradlew test          # sobe containers próprios, independentes do compose
 ```
 
+### 4.1 O gerador de dados sintéticos
+
+Se passa pelo ESP32 e alimenta o `/ingest` sem o carro presente ([ADR-005](02-decisoes-tecnicas.md)).
+Com a API no ar:
+
+```bash
+./gradlew gerador                                      # 60 s, padrões
+./gradlew gerador --args="--duracao=120 --reenviar=5"  # reenvia cada 5º lote
+```
+
+| Opção | Padrão | O que faz |
+|---|---|---|
+| `--duracao` | `60` | Segundos de coleta simulada |
+| `--url` | `http://localhost:8081` | Destino |
+| `--sessao` | `<hoje>-gerador-sintetico` | `sessionId` do lote |
+| `--reenviar` | `0` | A cada N lotes, reenvia com o **mesmo** `batchId` |
+
+Ele mora em `src/gerador/kotlin`, num source set próprio: é ferramenta, não parte da API, e
+**não entra no jar de produção**. Mas enxerga o domínio, então codifica os frames com as mesmas
+definições de sinal que o decodificador vai usar — sem duplicar a regra.
+
 ---
 
 ## 5. Ferramentas de bancada

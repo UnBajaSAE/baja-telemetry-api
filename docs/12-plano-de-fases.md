@@ -18,7 +18,7 @@ profundidade, não na quantidade de features.
 | Fase | Escopo | Checkpoints | Estado |
 |---|---|---|---|
 | **0** | Fundação documental | 5 | ✅ **5/5** |
-| **1** | Esqueleto — sobe, recebe, testa | 5 | 🔵 4/5 |
+| **1** | Esqueleto — sobe, recebe, testa | 5 | ✅ **5/5** |
 | **2** | Modelo de dados e decodificador | 6 | ⬜ 0/6 |
 | **3** | Consulta | 4 | ⬜ 0/4 |
 | **4** | Robustez | 5 | ⬜ 0/5 |
@@ -114,10 +114,25 @@ Medido com os eventos do Docker: **um único container** para os 27 testes.
 **Fechado em 10/09/2026.** Testcontainers 2.x mudou os nomes dos módulos e tirou o genérico do
 `PostgreSQLContainer` — registrado na tabela de atrito do `docs/11`.
 
-### ⬜ 1.5 · Gerador de dados sintéticos
+### ✅ 1.5 · Gerador de dados sintéticos
 Pré-requisito, não extra (ADR-005). Curva de RPM plausível, temperatura subindo, GPS num traçado.
-**Aceite:** o gerador alimenta o `/ingest` por 60 s sem o carro presente; e sabe simular queda de
-conexão com reenvio do **mesmo** `batchId`.
+**Aceite:** rodou 60 s contra a API real — 6.671 frames em 12 lotes, ~111 frames/s — e reenviou
+lotes com o **mesmo** `batchId`. Os frames foram capturados da rede e decodificados com
+`cantools`: RPM variando ~1.000 de amplitude dentro da faixa do DBC, temperatura subindo com o
+uso, marcha coerente com a velocidade, GPS num traçado fechado.
+**Fechado em 10/09/2026.** A codificação (`FrameEncoder`) entrou no domínio em vez de ser
+hardcodada no gerador — ela é a inversa do decodificador e o teste de propriedade da Fase 2 vai
+precisar dela. Bate **byte a byte** com o `cantools` nos três frames.
+
+> O gerador denuncia o que ainda não existe: ao reenviar um lote, ele avisa que os frames
+> entraram duas vezes e a API não percebeu — esperado até o checkpoint 2.6.
+
+---
+
+## ✅ Fase 1 completa
+
+A API sobe, recebe o contrato, tem banco no Compose, testa contra Postgres real, e há como gerar
+telemetria sem o carro. **Nada é persistido ainda** — é o que a Fase 2 resolve.
 
 ---
 

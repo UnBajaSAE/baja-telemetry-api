@@ -42,6 +42,30 @@ dependencies {
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+/**
+ * O gerador sintetico (ADR-005) e uma FERRAMENTA, nao parte da API: ele se passa
+ * pelo ESP32. Fica num source set proprio para nao entrar no jar de producao,
+ * mas enxerga o dominio -- e assim ele codifica os frames com as mesmas
+ * definicoes de sinal que o decodificador vai usar, sem duplicar a regra.
+ */
+sourceSets {
+	create("gerador") {
+		compileClasspath += sourceSets["main"].output
+		runtimeClasspath += sourceSets["main"].output
+	}
+}
+
+configurations.getByName("geradorImplementation") {
+	extendsFrom(configurations.implementation.get())
+}
+
+tasks.register<JavaExec>("gerador") {
+	group = "application"
+	description = "Alimenta o /ingest com telemetria sintetica, sem o carro presente (ADR-005)"
+	classpath = sourceSets["gerador"].runtimeClasspath
+	mainClass.set("br.unb.baja.telemetry.gerador.GeradorKt")
+}
+
 kotlin {
 	compilerOptions {
 		freeCompilerArgs.addAll("-Xjsr305=strict")
