@@ -13,14 +13,24 @@ object FrameEncoder {
      * @param dlc quantos bytes o frame carrega
      * @param valores valor fisico por sinal
      */
-    fun encode(dlc: Int, valores: Map<SignalDefinition, Double>): ByteArray {
+    fun encode(dlc: Int, valores: Map<SignalDefinition, Double>): ByteArray =
+        encodeRaw(dlc, valores.mapValues { (sinal, fisico) -> sinal.rawOf(fisico) })
+
+    /**
+     * Empacota valores JA crus, sem passar por escala e offset.
+     *
+     * Existe para o teste de propriedade poder verificar a ida e volta dos BITS
+     * em aritmetica inteira pura. Passando por grandeza fisica, uma divergencia
+     * de arredondamento em ponto flutuante se confundiria com um erro de
+     * empacotamento -- e sao problemas diferentes.
+     */
+    fun encodeRaw(dlc: Int, crus: Map<SignalDefinition, Long>): ByteArray {
         require(dlc in 1..CanFrame.MAX_PAYLOAD_BYTES) { "DLC $dlc fora de 1..8" }
         val bytes = ByteArray(dlc)
 
-        for ((sinal, fisico) in valores) {
-            val cru = sinal.rawOf(fisico)
-            // Complemento de dois: um valor negativo vira o padrao de bits sem sinal
-            // correspondente, dentro da largura declarada.
+        for ((sinal, cru) in crus) {
+            // Complemento de dois: um valor negativo vira o padrao de bits sem
+            // sinal correspondente, dentro da largura DECLARADA.
             val bits = if (cru < 0) cru + (1L shl sinal.bitLength) else cru
 
             sinal.bitPositionsMsbFirst().forEachIndexed { i, posicao ->

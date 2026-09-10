@@ -39,6 +39,9 @@ dependencies {
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	// Faz valer a regra do ADR-009: o pacote domain nao importa framework.
 	testImplementation("com.tngtech.archunit:archunit-junit5:1.5.0")
+	// Teste de propriedade do decodificador (docs/09 §3). O Spring Boot nao
+	// gerencia a versao do kotest, entao ela e fixada aqui.
+	testImplementation("io.kotest:kotest-property:6.2.5")
 	// Postgres de verdade no teste, nunca banco em memoria (ADR-003).
 	// Na linha 2.x do Testcontainers os modulos ganharam prefixo:
 	// e `testcontainers-postgresql`, nao `postgresql` como na 1.x.

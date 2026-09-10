@@ -3,13 +3,13 @@
 > **Atualize este arquivo ao fechar cada checkpoint.** É o primeiro que o Claude lê ao
 > retomar o trabalho, e o que evita recomeçar o contexto do zero a cada sessão.
 
-**Última atualização:** 10/09/2026 — checkpoint 2.3 fechado
+**Última atualização:** 10/09/2026 — checkpoint 2.4 fechado
 
 ---
 
 ## Fase atual
 
-**🔵 Fase 2 — Modelo de dados e decodificador (3/6).** O schema existe, a hypertable fatia sozinha, e o mapa de sinais é lido do arquivo.
+**🔵 Fase 2 — Modelo de dados e decodificador (4/6).** O coração do sistema existe: os bytes já viram grandeza física. Falta gravar.
 
 **✅ Fase 1 — Esqueleto: COMPLETA (5/5).** A API sobe, o banco roda no Compose, e o `/ingest` já aceita o contrato — mas **ainda não grava nada**.
 
@@ -61,6 +61,7 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 - [x] **`raw_frame` como hypertable** (V3) — chunks de 1 dia, índices e compressão em 30 dias
 - [x] **Parser do DBC** — lê `contracts/can/unbaja.dbc`, falha alto no que não suporta
 - [x] **Zero sinais hardcodados** — a verdade voltou a morar só no arquivo (ADR-006)
+- [x] **Decodificador** — duas propriedades + as três armadilhas, provado capaz de falhar
 
 ## O que NÃO existe ainda
 
@@ -75,29 +76,25 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 
 ## Próximo passo
 
-**Checkpoint 2.4 — o decodificador.** É o coração do sistema.
+**Checkpoint 2.5 — persistência em lote.** É aqui que o `/ingest` **finalmente grava**.
 
-**Aceite:** teste de propriedade `decode(encode(x)) ≈ x` passando com centenas de casos aleatórios
-nos **três** frames — incluindo o sinal que cruza fronteira de byte e o signed. Mais: valor fora
-da faixa do DBC é marcado inválido, não descartado em silêncio.
+**Aceite:** medir inserção linha a linha versus em lote e registrar os dois números. Confirmar
+que `rewriteBatchedStatements=true` está ativo — sem a flag o driver ignora o agrupamento em
+silêncio ([ADR-004](02-decisoes-tecnicas.md)).
 
-Metade do caminho já existe: o `FrameEncoder` (a ida) foi escrito no checkpoint 1.5 e bate byte a
-byte com o `cantools`. Falta a volta.
+Precisa também da tabela `signal_point` (migration V4) e do fluxo completo do
+[`docs/07 §4`](07-arquitetura-do-codigo.md): grava o cru, decodifica, grava os sinais, marca
+`decoded_at`, commita.
 
-As duas propriedades e o porquê da tolerância estão em [`docs/09 §3`](09-estrategia-de-testes.md):
-`encode(decode(bits)) == bits` é exata, mas `decode(encode(x)) ≈ x` **não pode** usar igualdade —
-a tolerância sai da escala do sinal, lida do DBC.
-
-Ao mexer aqui, seguir a skill `revisar-decodificador`.
-
-> ⚠️ **O `/ingest` ainda responde 2xx sem persistir.** Não apontar firmware real até o 2.5.
+> ⚠️ **Depois deste checkpoint o aviso sai:** o `/ingest` passa a persistir, e `framesStored`
+> deixa de ser 0. Até lá, não apontar firmware real para ele.
 
 ### Como rodar o que já existe
 
 ```bash
 docker compose up -d                       # sobe o banco
 ./gradlew bootRun                          # sobe a API na 8081
-./gradlew test                             # 63 testes
+./gradlew test                             # 73 testes
 ./gradlew gerador                          # telemetria sintetica, ~119 frames/s
 ```
 

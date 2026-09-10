@@ -98,6 +98,29 @@ fun `ida e volta preserva os bits, para qualquer padrao`() = runBlocking {
 Cada execução são centenas de casos. Se falhar, o relatório aponta o menor valor que quebra —
 e é aí que se descobre que o bit inicial estava um a mais.
 
+### 3.4 O limite do teste de propriedade — medido, não suposto
+
+**A ida e volta sozinha não basta**, e isso foi comprovado sabotando o código de propósito no
+checkpoint 2.4.
+
+O codificador e o decodificador compartilham a mesma função de posições de bit. Se ela estiver
+errada, estará errada **dos dois lados** — e a ida e volta fecha perfeitamente num valor errado.
+
+Introduzindo um off-by-one no ramo *little endian* (que mantém os sinais dentro do payload):
+
+| Teste | Pegou? |
+|---|---|
+| Propriedade `encode(decode(bits)) == bits` | ❌ **passou** — o erro é simétrico |
+| Exemplo contra os bytes do `cantools` | ✅ falhou |
+
+> **Conclusão prática:** teste de propriedade cobre o espaço de entrada; teste de exemplo contra
+> uma **implementação independente** cobre o entendimento do formato. Os dois são necessários, e
+> por motivos diferentes. Um decodificador só com teste de propriedade pode estar internamente
+> consistente e completamente errado.
+
+Sabotagens que a propriedade **pegou** sozinha: extensão de sinal com largura fixa em vez da
+declarada, e erros de posição que jogam bits para fora do DLC.
+
 ---
 
 ## 4. Os casos que o decodificador é obrigado a passar

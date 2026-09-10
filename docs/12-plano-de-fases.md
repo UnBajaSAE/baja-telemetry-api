@@ -19,7 +19,7 @@ profundidade, não na quantidade de features.
 |---|---|---|---|
 | **0** | Fundação documental | 5 | ✅ **5/5** |
 | **1** | Esqueleto — sobe, recebe, testa | 5 | ✅ **5/5** |
-| **2** | Modelo de dados e decodificador | 6 | 🔵 3/6 |
+| **2** | Modelo de dados e decodificador | 6 | 🔵 4/6 |
 | **3** | Consulta | 4 | ⬜ 0/4 |
 | **4** | Robustez | 5 | ⬜ 0/5 |
 | **5** | Deploy e medição | 4 | ⬜ 0/4 |
@@ -168,10 +168,17 @@ da linha e o conteúdo. 16 testes, rodando contra o arquivo de verdade.
 hardcodadas no repositório, a verdade voltou a morar só no `.dbc` (ADR-006). O build copia o
 arquivo para o classpath, e a aplicação recusa subir se ele estiver inválido.
 
-### ⬜ 2.4 · Decodificador de frame
-**Aceite:** teste de propriedade `decode(encode(x)) ≈ x` passa com centenas de casos aleatórios
-nos **três** frames — incluindo o sinal que cruza fronteira de byte e o signed. Mais: valor fora
-da faixa do DBC é marcado inválido, não descartado em silêncio.
+### ✅ 2.4 · Decodificador de frame
+**Aceite:** as duas propriedades passam nos seis sinais dos três frames — `encode(decode(bits))`
+exata em aritmética inteira, e `|decode(encode(x)) − x| ≤ escala/2` com a tolerância lida do DBC.
+Valor fora de faixa é **marcado** com o valor preservado; payload curto vira `NaN` explícito e
+nunca zero, que seria confundido com leitura real.
+**Fechado em 10/09/2026.** 11 testes novos, 73 no total.
+
+> **Achado ao sabotar o código de propósito:** a ida e volta **não** detecta erro na função de
+> posições de bit, porque encoder e decoder a compartilham — o erro é simétrico e o teste fecha
+> num valor errado. Quem pegou foi a comparação com o `cantools`. Registrado em
+> [`docs/09 §3.4`](09-estrategia-de-testes.md).
 
 ### ⬜ 2.5 · Persistência em lote
 **Aceite:** medir inserção linha a linha versus em lote e registrar os dois números. Confirmar
