@@ -3,13 +3,13 @@
 > **Atualize este arquivo ao fechar cada checkpoint.** É o primeiro que o Claude lê ao
 > retomar o trabalho, e o que evita recomeçar o contexto do zero a cada sessão.
 
-**Última atualização:** 10/09/2026 — checkpoint 1.2 fechado
+**Última atualização:** 10/09/2026 — checkpoint 1.3 fechado
 
 ---
 
 ## Fase atual
 
-**🔵 Fase 1 — Esqueleto (2/5).** O projeto Gradle sobe e o banco já roda no Compose.
+**🔵 Fase 1 — Esqueleto (3/5).** A API sobe, o banco roda no Compose, e o `/ingest` já aceita o contrato — mas **ainda não grava nada**.
 
 **✅ Fase 0 — Fundação documental: COMPLETA.** As decisões de domínio, dados, arquitetura,
 contratos e qualidade estão registradas, e as verificáveis foram verificadas contra ferramenta
@@ -49,6 +49,9 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 - [x] **Projeto Gradle** — Kotlin 2.4.10 · Spring Boot 4.1.1 · JDK 25 · Gradle 9.7.1
 - [x] `/actuator/health` respondendo `UP` na porta **8081**, com teste que o afirma
 - [x] **`docker-compose.yml`** — PostgreSQL 17.11 + TimescaleDB 2.29.2, `healthy` em ~6 s
+- [x] **`POST /api/v1/ingest`** validando o contrato, com Problem Details e `retryable`
+- [x] Domínio puro (`CanFrame`, `SessionId`) — 15 testes em **0,04 s**, sem Spring
+- [x] Teste de arquitetura (ArchUnit) fiscalizando o ADR-009
 
 ## O que NÃO existe ainda
 
@@ -56,26 +59,24 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 
 - [ ] **DBC com os sinais reais** — o atual é fictício (ver abaixo)
 - [ ] Gerador de dados sintéticos
-- [ ] Teste do decodificador, do banco, de ingestão (só existe o de saúde)
+- [ ] Persistência: nada é gravado ainda (`framesStored` é sempre 0)
+- [ ] Decodificador, parser DBC, Flyway, gerador sintético
 
 ---
 
 ## Próximo passo
 
-**Checkpoint 1.3 — `POST /api/v1/ingest` aceita o contrato.**
+**Checkpoint 1.4 — primeiro teste com Testcontainers.**
 
-Ainda **sem persistir nada**: só valida a forma do lote e devolve a resposta. Separar "aceitar o
-contrato" de "gravar no banco" mantém o passo pequeno — se der erro, dá para saber se é o JSON ou
-o SQL.
+**Aceite:** `./gradlew test` sobe um Postgres real (com TimescaleDB), conecta e passa. O teste
+falha se o container não subir — nunca cai em banco em memória por baixo ([ADR-003](02-decisoes-tecnicas.md)).
 
-**Aceite:** `curl` com o corpo de exemplo do [`docs/03`](03-protocolo-ingestao.md) devolve 200
-com `framesReceived: 2`; corpo malformado devolve 400 no formato Problem Details do
-[`docs/08`](08-contrato-de-erros.md).
+Cuidado que já está previsto no [`docs/09 §6`](09-estrategia-de-testes.md): **um container para a
+suíte inteira**, não um por classe de teste. Vinte classes com container próprio seriam vinte
+bootstraps.
 
-O contrato já está fechado desde a Fase 0: o formato em [`docs/03`](03-protocolo-ingestao.md), os
-limites (≤ 5.000 frames, hex par, ≤ 8 bytes), o catálogo de erros em
-[`docs/08`](08-contrato-de-erros.md) e o schema em `contracts/openapi.yaml`. É implementar o que
-já foi decidido.
+> ⚠️ **O `/ingest` responde 2xx sem persistir** (`framesStored: 0`). Não apontar firmware real
+> para ele até o checkpoint 2.5 — o ESP32 apaga o cartão ao ver 2xx, e o dado sumiria.
 
 ### Como rodar o que já existe
 
@@ -83,6 +84,7 @@ já foi decidido.
 docker compose up -d                       # sobe o banco
 ./gradlew bootRun                          # sobe a API
 curl localhost:8081/actuator/health        # {"status":"UP"}
+./gradlew test                             # 24 testes
 ```
 
 ### Pendência paralela do Heitor: levantar os sinais reais

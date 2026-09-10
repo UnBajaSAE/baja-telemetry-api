@@ -18,7 +18,7 @@ profundidade, não na quantidade de features.
 | Fase | Escopo | Checkpoints | Estado |
 |---|---|---|---|
 | **0** | Fundação documental | 5 | ✅ **5/5** |
-| **1** | Esqueleto — sobe, recebe, testa | 5 | 🔵 2/5 |
+| **1** | Esqueleto — sobe, recebe, testa | 5 | 🔵 3/5 |
 | **2** | Modelo de dados e decodificador | 6 | ⬜ 0/6 |
 | **3** | Consulta | 4 | ⬜ 0/4 |
 | **4** | Robustez | 5 | ⬜ 0/5 |
@@ -93,10 +93,17 @@ porta publicada devolve `timescaledb 2.29.2` sobre PostgreSQL 17.11.
 **Fechado em 10/09/2026.** O volume foi verificado de fato: tabela gravada sobreviveu a um
 `down` + `up`. A porta é amarrada em `127.0.0.1` para o banco não ficar exposto na rede.
 
-### ⬜ 1.3 · `POST /api/v1/ingest` aceita o contrato
+### ✅ 1.3 · `POST /api/v1/ingest` aceita o contrato
 Ainda **sem persistir** — valida a forma e devolve a resposta.
-**Aceite:** `curl` com o corpo de exemplo do `docs/03` devolve 200 com `framesReceived: 2`;
-corpo malformado devolve 400.
+**Aceite:** verificado com a aplicação real. O lote de exemplo devolve 200 com
+`framesReceived: 2`; JSON quebrado devolve 400 e `sessionId` fora do formato devolve 422, ambos
+em Problem Details com `retryable: false`. Um frame torto entre bons devolve 200 com
+`framesRejected: 1` (ADR-010).
+**Fechado em 10/09/2026.** 24 testes no total. Entrou o teste de arquitetura do ADR-009, provado
+capaz de falhar.
+
+> ⚠️ **Não apontar firmware real para este endpoint ainda.** Ele responde 2xx sem persistir
+> (`framesStored: 0`), e o ESP32 apaga o buffer ao ver 2xx. A gravação entra no checkpoint 2.5.
 
 ### ⬜ 1.4 · Primeiro teste com Testcontainers
 **Aceite:** `./gradlew test` sobe um Postgres real, conecta e passa. O teste falha se o
