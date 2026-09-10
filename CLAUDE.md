@@ -94,6 +94,7 @@ API de ingestão e consulta de telemetria do Baja SAE. As quatro ECUs do carro c
 | `docs/11-ambiente-e-setup.md` | Versões fixadas e como rodar |
 | **`docs/12-plano-de-fases.md`** | **Mapa de checkpoints** — todas as fases com critério de aceitação |
 | **`docs/13-o-caminho-de-um-lote.md`** | **Porta de entrada visual** — o fluxo inteiro em diagramas mermaid |
+| **`docs/14-entendendo-o-projeto.md`** | **Do zero, para quem não é de backend** — o que é cada ferramenta e por quê |
 
 **Nenhum deles é carregado automaticamente** — abra `docs/00-estado-atual.md` ao retomar o trabalho.
 

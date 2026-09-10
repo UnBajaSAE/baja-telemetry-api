@@ -69,7 +69,8 @@ As justificativas completas estão em [`docs/02-decisoes-tecnicas.md`](docs/02-d
 
 | Documento | Conteúdo |
 |---|---|
-| 🚩 [**`docs/13-o-caminho-de-um-lote.md`**](docs/13-o-caminho-de-um-lote.md) | **Comece por aqui.** O sistema inteiro em diagramas: do cartão SD ao banco, e de volta |
+| 🚩 [**`docs/14-entendendo-o-projeto.md`**](docs/14-entendendo-o-projeto.md) | **Comece por aqui se não é do backend.** O que é cada peça e por que ela existe, do zero |
+| 🚩 [**`docs/13-o-caminho-de-um-lote.md`**](docs/13-o-caminho-de-um-lote.md) | **Como as peças trabalham juntas** — o sistema inteiro em diagramas |
 | [`docs/01-dominio-can.md`](docs/01-dominio-can.md) | O que é um frame CAN, como um byte cru vira grandeza física, o que é DBC |
 | [`docs/02-decisoes-tecnicas.md`](docs/02-decisoes-tecnicas.md) | Decisões de arquitetura com justificativa (formato ADR) |
 | [`docs/03-protocolo-ingestao.md`](docs/03-protocolo-ingestao.md) | Contrato entre o ESP32 e a API: lote, idempotência, dado fora de ordem |

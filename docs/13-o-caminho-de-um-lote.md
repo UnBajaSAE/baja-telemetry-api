@@ -1,6 +1,9 @@
 # 13 · O caminho de um lote
 
-**O documento visual do projeto.** Se você só for ler um arquivo desta pasta, leia este.
+**O documento visual do projeto** — como as peças trabalham juntas.
+
+> Nunca mexeu com backend? Comece pelo [`docs/14`](14-entendendo-o-projeto.md), que explica
+> **o que é cada peça** antes de mostrar elas em movimento.
 
 Acompanha um único lote de dados da leitura no barramento CAN até o ESP32 apagar o cartão —
 que é, no fim, tudo que o sistema faz:
