@@ -3,13 +3,13 @@
 > **Atualize este arquivo ao fechar cada checkpoint.** É o primeiro que o Claude lê ao
 > retomar o trabalho, e o que evita recomeçar o contexto do zero a cada sessão.
 
-**Última atualização:** 09/09/2026 — checkpoint 1.1 fechado
+**Última atualização:** 10/09/2026 — checkpoint 1.2 fechado
 
 ---
 
 ## Fase atual
 
-**🔵 Fase 1 — Esqueleto (1/5).** A Fase 0 está completa e o projeto Gradle já sobe.
+**🔵 Fase 1 — Esqueleto (2/5).** O projeto Gradle sobe e o banco já roda no Compose.
 
 **✅ Fase 0 — Fundação documental: COMPLETA.** As decisões de domínio, dados, arquitetura,
 contratos e qualidade estão registradas, e as verificáveis foram verificadas contra ferramenta
@@ -48,11 +48,12 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 - [x] `CLAUDE.md` e 4 skills em `.claude/skills/`
 - [x] **Projeto Gradle** — Kotlin 2.4.10 · Spring Boot 4.1.1 · JDK 25 · Gradle 9.7.1
 - [x] `/actuator/health` respondendo `UP` na porta **8081**, com teste que o afirma
+- [x] **`docker-compose.yml`** — PostgreSQL 17.11 + TimescaleDB 2.29.2, `healthy` em ~6 s
 
 ## O que NÃO existe ainda
 
 - [x] ~~Projeto Gradle / código Kotlin~~ — existe e sobe (checkpoint 1.1)
-- [ ] `docker-compose.yml`
+
 - [ ] **DBC com os sinais reais** — o atual é fictício (ver abaixo)
 - [ ] Gerador de dados sintéticos
 - [ ] Teste do decodificador, do banco, de ingestão (só existe o de saúde)
@@ -61,15 +62,28 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 
 ## Próximo passo
 
-**Checkpoint 1.2 — Postgres + TimescaleDB via Compose.**
+**Checkpoint 1.3 — `POST /api/v1/ingest` aceita o contrato.**
 
-**Aceite:** `docker compose up -d` sobe, e conectado por `psql` o comando
-`SELECT extversion FROM pg_extension WHERE extname='timescaledb'` devolve uma versão.
+Ainda **sem persistir nada**: só valida a forma do lote e devolve a resposta. Separar "aceitar o
+contrato" de "gravar no banco" mantém o passo pequeno — se der erro, dá para saber se é o JSON ou
+o SQL.
 
-O `docker-compose.yml` já está escrito e comentado linha a linha em
-[`docs/11 §3`](11-ambiente-e-setup.md) — inclusive o `healthcheck`, que existe por causa da
-corrida de inicialização real que pegamos ao validar o DDL. É materializar o arquivo e confirmar
-a menor coisa antes de escrever qualquer repositório.
+**Aceite:** `curl` com o corpo de exemplo do [`docs/03`](03-protocolo-ingestao.md) devolve 200
+com `framesReceived: 2`; corpo malformado devolve 400 no formato Problem Details do
+[`docs/08`](08-contrato-de-erros.md).
+
+O contrato já está fechado desde a Fase 0: o formato em [`docs/03`](03-protocolo-ingestao.md), os
+limites (≤ 5.000 frames, hex par, ≤ 8 bytes), o catálogo de erros em
+[`docs/08`](08-contrato-de-erros.md) e o schema em `contracts/openapi.yaml`. É implementar o que
+já foi decidido.
+
+### Como rodar o que já existe
+
+```bash
+docker compose up -d                       # sobe o banco
+./gradlew bootRun                          # sobe a API
+curl localhost:8081/actuator/health        # {"status":"UP"}
+```
 
 ### Pendência paralela do Heitor: levantar os sinais reais
 

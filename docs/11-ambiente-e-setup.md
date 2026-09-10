@@ -73,34 +73,35 @@ Não é preciso instalar Gradle: o wrapper (`./gradlew`) baixa a versão certa s
 
 ## 3. O `docker-compose.yml`
 
-> Este arquivo **ainda não existe** — ele é criado no checkpoint 1.2, junto com o projeto Gradle.
-> Está aqui como alvo, comentado linha a linha.
+> Criado no checkpoint 1.2. O conteúdo abaixo é o arquivo real, comentado linha a linha.
 
 ```yaml
 services:
   db:
-    # A imagem ja traz a extensao TimescaleDB compilada.
-    # Um postgres:17 puro NAO serve - a extensao teria que ser compilada a mao.
+    # A imagem ja traz a extensao TimescaleDB compilada e habilitada no banco
+    # padrao. Um postgres:17 puro NAO serve -- a extensao teria que ser
+    # compilada e instalada a mao.
     image: timescale/timescaledb:latest-pg17
 
     environment:
       POSTGRES_DB: baja
       POSTGRES_USER: baja
-      # Só para desenvolvimento local. Em produção vem de variável de ambiente,
+      # So para desenvolvimento local. Em producao vem de variavel de ambiente,
       # nunca de arquivo versionado.
       POSTGRES_PASSWORD: baja
 
     ports:
-      # Exposto para dar para conectar com psql e com o DBeaver de fora do container.
-      - "5432:5432"
+      # Amarrado em 127.0.0.1 de proposito: sem isso o Docker publica em todas
+      # as interfaces, e um banco de senha fraca fica alcancavel pela rede.
+      - "127.0.0.1:5432:5432"
 
     volumes:
-      # Sem isso, o banco morre junto com o container e cada `down` apaga tudo.
+      # Sem isso o dado morre junto com o container, e cada `down` apaga tudo.
       - baja-db:/var/lib/postgresql/data
 
     healthcheck:
-      # A aplicação sobe mais rápido que o Postgres fica pronto. Sem healthcheck,
-      # o Flyway tenta conectar num banco que ainda está iniciando e a subida falha.
+      # A aplicacao sobe mais rapido que o Postgres fica pronto. Sem isso o
+      # Flyway tenta conectar num banco ainda iniciando e a subida falha.
       test: ["CMD-SHELL", "pg_isready -U baja -d baja"]
       interval: 5s
       timeout: 3s
@@ -109,6 +110,11 @@ services:
 volumes:
   baja-db:
 ```
+
+**Por que `127.0.0.1:5432:5432` e não `5432:5432`:** a forma curta faz o Docker publicar em
+**todas** as interfaces de rede. Um banco de desenvolvimento com senha `baja` alcançável pela
+rede local é risco desnecessário — e é grátis evitar. Prefixar com `127.0.0.1` limita ao próprio
+computador, que é tudo que o desenvolvimento precisa.
 
 **A `healthcheck` não é zelo excessivo, e o motivo é mais sutil do que parece.**
 
@@ -132,8 +138,12 @@ correto:
 until [ "$(docker logs db 2>&1 | grep -c 'ready to accept connections')" -ge 2 ]; do sleep 1; done
 ```
 
-Nas medições deste projeto o banco ficou pronto de verdade em ~5 s. O `healthcheck` do compose com
-`retries: 10` e `interval: 5s` cobre essa janela com folga.
+Nas medições deste projeto o banco ficou pronto de verdade em ~5 s, e o healthcheck do compose
+marcou `healthy` em ~6 s — dentro da janela de `retries: 10` × `interval: 5s`, com folga.
+
+**O volume também foi verificado, não só declarado:** com uma tabela gravada, um
+`docker compose down` seguido de `up -d` devolveu o dado intacto. `down` remove o container e a
+rede, mas preserva o volume nomeado; quem apaga o dado é `down -v`.
 
 ### 3.1 A extensão precisa ser criada uma vez
 

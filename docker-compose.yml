@@ -1,0 +1,33 @@
+services:
+  db:
+    # A imagem ja traz a extensao TimescaleDB compilada e habilitada no banco
+    # padrao. Um postgres:17 puro NAO serve -- a extensao teria que ser
+    # compilada e instalada a mao.
+    image: timescale/timescaledb:latest-pg17
+
+    environment:
+      POSTGRES_DB: baja
+      POSTGRES_USER: baja
+      # So para desenvolvimento local. Em producao vem de variavel de ambiente,
+      # nunca de arquivo versionado.
+      POSTGRES_PASSWORD: baja
+
+    ports:
+      # Amarrado em 127.0.0.1 de proposito: sem isso o Docker publica em todas
+      # as interfaces, e um banco de senha fraca fica alcancavel pela rede.
+      - "127.0.0.1:5432:5432"
+
+    volumes:
+      # Sem isso o dado morre junto com o container, e cada `down` apaga tudo.
+      - baja-db:/var/lib/postgresql/data
+
+    healthcheck:
+      # A aplicacao sobe mais rapido que o Postgres fica pronto. Sem isso o
+      # Flyway tenta conectar num banco ainda iniciando e a subida falha.
+      test: ["CMD-SHELL", "pg_isready -U baja -d baja"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  baja-db:
