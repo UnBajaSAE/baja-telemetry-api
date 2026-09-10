@@ -18,7 +18,7 @@ profundidade, não na quantidade de features.
 | Fase | Escopo | Checkpoints | Estado |
 |---|---|---|---|
 | **0** | Fundação documental | 5 | ✅ **5/5** |
-| **1** | Esqueleto — sobe, recebe, testa | 5 | ⬜ 0/5 |
+| **1** | Esqueleto — sobe, recebe, testa | 5 | 🔵 1/5 |
 | **2** | Modelo de dados e decodificador | 6 | ⬜ 0/6 |
 | **3** | Consulta | 4 | ⬜ 0/4 |
 | **4** | Robustez | 5 | ⬜ 0/5 |
@@ -80,9 +80,12 @@ TimescaleDB; 11 diagramas mermaid parseiam; zero links quebrados.
 > **A Fase 1 começa aqui.** Versões e comandos em [`docs/11`](11-ambiente-e-setup.md);
 > estrutura de pacotes em [`docs/07 §2`](07-arquitetura-do-codigo.md).
 
-### ⬜ 1.1 · Projeto Gradle + Spring Boot sobe
-**Aceite:** `./gradlew bootRun` sobe, e `curl localhost:8080/actuator/health` devolve
-`{"status":"UP"}`.
+### ✅ 1.1 · Projeto Gradle + Spring Boot sobe
+**Aceite:** `./gradlew bootRun` sobe, e `curl localhost:8081/actuator/health` devolve
+`{"status":"UP"}` — verificado com a aplicação real, mais um teste `@SpringBootTest` que afirma
+o mesmo e que foi provado capaz de falhar.
+**Fechado em 09/09/2026.** Porta 8081 porque a 8080 já é usada por outro projeto na máquina.
+Corrigiu de quebra um bug no `.gitignore` que impedia o `gradle-wrapper.jar` de ser versionado.
 
 ### ⬜ 1.2 · Postgres + TimescaleDB via Compose
 **Aceite:** `docker compose up -d`, e `psql` conectado executa

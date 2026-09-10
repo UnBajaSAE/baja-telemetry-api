@@ -3,11 +3,13 @@
 > **Atualize este arquivo ao fechar cada checkpoint.** É o primeiro que o Claude lê ao
 > retomar o trabalho, e o que evita recomeçar o contexto do zero a cada sessão.
 
-**Última atualização:** 25/08/2026 — Fase 0 fechada
+**Última atualização:** 09/09/2026 — checkpoint 1.1 fechado
 
 ---
 
 ## Fase atual
+
+**🔵 Fase 1 — Esqueleto (1/5).** A Fase 0 está completa e o projeto Gradle já sobe.
 
 **✅ Fase 0 — Fundação documental: COMPLETA.** As decisões de domínio, dados, arquitetura,
 contratos e qualidade estão registradas, e as verificáveis foram verificadas contra ferramenta
@@ -44,44 +46,30 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 - [x] `contracts/can/unbaja.dbc` — DBC **provisório**, validado com `cantools`
 - [x] `contracts/openapi.yaml` — validado com `openapi-spec-validator`
 - [x] `CLAUDE.md` e 4 skills em `.claude/skills/`
+- [x] **Projeto Gradle** — Kotlin 2.4.10 · Spring Boot 4.1.1 · JDK 25 · Gradle 9.7.1
+- [x] `/actuator/health` respondendo `UP` na porta **8081**, com teste que o afirma
 
 ## O que NÃO existe ainda
 
-- [ ] Projeto Gradle / qualquer código Kotlin
+- [x] ~~Projeto Gradle / código Kotlin~~ — existe e sobe (checkpoint 1.1)
 - [ ] `docker-compose.yml`
 - [ ] **DBC com os sinais reais** — o atual é fictício (ver abaixo)
 - [ ] Gerador de dados sintéticos
-- [ ] Qualquer teste
+- [ ] Teste do decodificador, do banco, de ingestão (só existe o de saúde)
 
 ---
 
 ## Próximo passo
 
-**Checkpoint 1.1 — o projeto Gradle sobe.** Primeira linha de Kotlin do projeto.
+**Checkpoint 1.2 — Postgres + TimescaleDB via Compose.**
 
-**Aceite:** `./gradlew bootRun` sobe e `curl localhost:8080/actuator/health` devolve
-`{"status":"UP"}`.
+**Aceite:** `docker compose up -d` sobe, e conectado por `psql` o comando
+`SELECT extversion FROM pg_extension WHERE extname='timescaledb'` devolve uma versão.
 
-Antes de começar, ler [`docs/11`](11-ambiente-e-setup.md) (versões fixadas: JDK 25 · Kotlin
-2.4.10 · Spring Boot 4.1.1) e [`docs/07 §2`](07-arquitetura-do-codigo.md) (onde cada arquivo mora).
-O plano completo da fase está em [`docs/12`](12-plano-de-fases.md).
-
-> **Pré-requisitos de máquina — ✅ todos resolvidos, verificados em 09/09/2026:**
->
-> | | Estado |
-> |---|---|
-> | JDK | ✅ Temurin **25.0.4.1+1 LTS** (`java` e `javac`), via `mise`, global |
-> | Docker | ✅ **29.7.2**, daemon ativo |
-> | Grupo `docker` | ✅ propagado após reboot — `id -nG` traz `docker` |
-> | Container do banco | ✅ `timescale/timescaledb:latest-pg17` sobe em ~5 s |
->
-> Não foi verificado só o `--version`: um container de **PostgreSQL 17.11 + TimescaleDB 2.29.2**
-> foi realmente iniciado e consultado, para não descobrir problema de ambiente lá no checkpoint
-> 1.4, quando o Testcontainers do [ADR-003](02-decisoes-tecnicas.md) entrar.
->
-> Histórico do que travou: o usuário não estava no grupo `docker` (socket recriado em 05/09), e
-> depois do `usermod` a sessão gráfica ainda carregava as credenciais antigas — grupos são lidos
-> na criação do processo. O reboot resolveu.
+O `docker-compose.yml` já está escrito e comentado linha a linha em
+[`docs/11 §3`](11-ambiente-e-setup.md) — inclusive o `healthcheck`, que existe por causa da
+corrida de inicialização real que pegamos ao validar o DDL. É materializar o arquivo e confirmar
+a menor coisa antes de escrever qualquer repositório.
 
 ### Pendência paralela do Heitor: levantar os sinais reais
 

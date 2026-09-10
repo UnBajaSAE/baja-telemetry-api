@@ -1,13 +1,17 @@
 # Gradle
 .gradle/
 build/
-!gradle/wrapper/gradle-wrapper.jar
 
 # Kotlin / JVM
 *.class
 *.jar
 *.war
 hs_err_pid*
+
+# O wrapper do Gradle PRECISA ser versionado: e ele que permite rodar
+# ./gradlew numa maquina sem Gradle instalado. A negacao tem que vir DEPOIS
+# do *.jar acima -- em .gitignore, a ultima regra que casa e a que vale.
+!gradle/wrapper/gradle-wrapper.jar
 
 # IDE
 .idea/

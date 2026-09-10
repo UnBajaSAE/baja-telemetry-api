@@ -14,7 +14,7 @@ Verificadas nos repositórios oficiais em 25/08/2026.
 | **JDK** | **25** (Temurin) | LTS mais recente. Um projeto novo em 2026 começando num LTS antigo já nasce com dívida |
 | **Kotlin** | **2.4.10** | Última estável. A 2.4.20 está em RC — release candidate não entra em projeto que serve de prova técnica |
 | **Spring Boot** | **4.1.1** | Última estável, linha 4 desde nov/2025. Decisão do Heitor; ver §1.1 |
-| **Gradle** | Wrapper, **Kotlin DSL** | O wrapper fixa a versão no repositório: quem clonar roda a mesma. Kotlin DSL dá autocompletar e erro em tempo de compilação no build |
+| **Gradle** | **9.7.1**, via wrapper, **Kotlin DSL** | O wrapper fixa a versão no repositório: quem clonar roda a mesma. Kotlin DSL dá autocompletar e erro em tempo de compilação no build |
 | **PostgreSQL** | **17** | Maduro, suporte pleno do Timescale, e é o que a maioria dos gerenciados oferece — o que importa para a Fase 5 |
 | **TimescaleDB** | **2.29.2** | O que vem em `timescale/timescaledb:latest-pg17` |
 | **Flyway** | a do Spring Boot | Schema versionado em git, nunca `ddl-auto` |
@@ -36,6 +36,20 @@ e *"por que 3.x num projeto de 2026?"* é uma pergunta desconfortável numa entr
 
 Aceito conscientemente. Quando um exemplo da internet não bater, o primeiro suspeito é a diferença
 de linha, não o próprio código.
+
+**O atrito já apareceu no primeiro checkpoint**, e vale como amostra do que esperar:
+
+| Na linha 3.x | Na 4.1 |
+|---|---|
+| `org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc` | `org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc` |
+| starter `spring-boot-starter-web` | `spring-boot-starter-webmvc` |
+| `com.fasterxml.jackson.module:jackson-module-kotlin` | `tools.jackson.module:jackson-module-kotlin` (Jackson 3) |
+
+Nenhum deles quebra em runtime — **quebram na compilação**, que é o lugar barato de descobrir.
+
+**Uma armadilha do Initializr:** ele gera com a versão do Kotlin contra a qual o Boot foi testado
+(2.3.21) e adiciona `-Xannotation-default-target=param-property`, que na 2.4 já é o padrão e vira
+aviso em todo build. Subimos para a 2.4.10 do §1 e removemos a flag — o build passa.
 
 ---
 
@@ -152,8 +166,12 @@ psql -h localhost -U baja -d baja \
 ./gradlew bootRun
 
 # 4. confere que está viva
-curl localhost:8080/actuator/health
+curl localhost:8081/actuator/health
 ```
+
+> **Por que a porta 8081 e não a 8080 padrão do Spring:** a 8080 já é usada por outro projeto na
+> máquina de desenvolvimento. Nada no projeto depende desse número — está em uma linha do
+> `src/main/resources/application.properties` e trocar ali basta.
 
 E os testes:
 
