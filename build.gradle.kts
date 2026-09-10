@@ -24,6 +24,8 @@ dependencies {
 	// servico, porque pelo ADR-010 um frame ruim nao derruba o lote).
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
+	implementation("org.springframework.boot:spring-boot-starter-jdbc")
+	runtimeOnly("org.postgresql:postgresql")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	implementation("tools.jackson.module:jackson-module-kotlin")
 	testImplementation("org.springframework.boot:spring-boot-starter-actuator-test")
@@ -31,6 +33,12 @@ dependencies {
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	// Faz valer a regra do ADR-009: o pacote domain nao importa framework.
 	testImplementation("com.tngtech.archunit:archunit-junit5:1.5.0")
+	// Postgres de verdade no teste, nunca banco em memoria (ADR-003).
+	// Na linha 2.x do Testcontainers os modulos ganharam prefixo:
+	// e `testcontainers-postgresql`, nao `postgresql` como na 1.x.
+	testImplementation("org.springframework.boot:spring-boot-testcontainers")
+	testImplementation("org.testcontainers:testcontainers-postgresql")
+	testImplementation("org.testcontainers:testcontainers-junit-jupiter")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

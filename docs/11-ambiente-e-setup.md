@@ -44,6 +44,8 @@ de linha, não o próprio código.
 | `org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc` | `org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc` |
 | starter `spring-boot-starter-web` | `spring-boot-starter-webmvc` |
 | `com.fasterxml.jackson.module:jackson-module-kotlin` | `tools.jackson.module:jackson-module-kotlin` (Jackson 3) |
+| `org.testcontainers:postgresql` (Testcontainers 1.x) | `org.testcontainers:testcontainers-postgresql` (2.x — os módulos ganharam prefixo) |
+| `PostgreSQLContainer<*>` — a classe era genérica | `PostgreSQLContainer` — deixou de ser, na 2.x |
 
 Nenhum deles quebra em runtime — **quebram na compilação**, que é o lugar barato de descobrir.
 
@@ -178,6 +180,10 @@ psql -h localhost -U baja -d baja \
 # 4. confere que está viva
 curl localhost:8081/actuator/health
 ```
+
+> **O `/actuator/health` agora depende do banco.** Com o Compose no ar ele responde `200 UP`;
+> com o banco parado responde **`503 DOWN`** — que é o mesmo `storage-unavailable` retentável do
+> [`docs/08`](08-contrato-de-erros.md). Se subir a API sem o banco, é esse o sintoma.
 
 > **Por que a porta 8081 e não a 8080 padrão do Spring:** a 8080 já é usada por outro projeto na
 > máquina de desenvolvimento. Nada no projeto depende desse número — está em uma linha do

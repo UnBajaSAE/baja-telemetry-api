@@ -137,7 +137,9 @@ tiver fiscal. Um teste ArchUnit quebra o build se alguém anotar uma classe de d
 O [ADR-003](02-decisoes-tecnicas.md) já decidiu Postgres real em vez de H2. O risco prático é a
 suíte ficar tão lenta que ninguém rode.
 
-**A regra: um container para a suíte inteira, não um por classe de teste.** Em Spring Boot isso é
+**A regra: um container para a suíte inteira, não um por classe de teste.** ✅ **Verificado** no
+checkpoint 1.4 — observando os eventos do Docker durante a suíte completa, foi criado
+**exatamente um** container `timescale/timescaledb`, para as 27 execuções de teste. Em Spring Boot isso é
 uma classe base com o container em `companion object` e `@ServiceConnection`, ou o modo *reuse* do
 Testcontainers. Subir um Postgres por classe transformaria 20 classes em 20 bootstraps.
 

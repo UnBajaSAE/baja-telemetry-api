@@ -18,7 +18,7 @@ profundidade, não na quantidade de features.
 | Fase | Escopo | Checkpoints | Estado |
 |---|---|---|---|
 | **0** | Fundação documental | 5 | ✅ **5/5** |
-| **1** | Esqueleto — sobe, recebe, testa | 5 | 🔵 3/5 |
+| **1** | Esqueleto — sobe, recebe, testa | 5 | 🔵 4/5 |
 | **2** | Modelo de dados e decodificador | 6 | ⬜ 0/6 |
 | **3** | Consulta | 4 | ⬜ 0/4 |
 | **4** | Robustez | 5 | ⬜ 0/5 |
@@ -105,9 +105,14 @@ capaz de falhar.
 > ⚠️ **Não apontar firmware real para este endpoint ainda.** Ele responde 2xx sem persistir
 > (`framesStored: 0`), e o ESP32 apaga o buffer ao ver 2xx. A gravação entra no checkpoint 2.5.
 
-### ⬜ 1.4 · Primeiro teste com Testcontainers
-**Aceite:** `./gradlew test` sobe um Postgres real, conecta e passa. O teste falha se o
-container não subir — nunca cai em banco em memória por baixo (ADR-003).
+### ✅ 1.4 · Primeiro teste com Testcontainers
+**Aceite:** as duas metades foram verificadas. A suíte sobe um PostgreSQL 17 real com
+TimescaleDB, e `create_hypertable` funciona nele (o que nenhum banco em memória faz). E
+apontando a configuração para uma imagem inexistente, **o teste falha** — não existe queda
+silenciosa para banco em memória.
+Medido com os eventos do Docker: **um único container** para os 27 testes.
+**Fechado em 10/09/2026.** Testcontainers 2.x mudou os nomes dos módulos e tirou o genérico do
+`PostgreSQLContainer` — registrado na tabela de atrito do `docs/11`.
 
 ### ⬜ 1.5 · Gerador de dados sintéticos
 Pré-requisito, não extra (ADR-005). Curva de RPM plausível, temperatura subindo, GPS num traçado.

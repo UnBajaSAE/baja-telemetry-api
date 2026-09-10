@@ -3,13 +3,13 @@
 > **Atualize este arquivo ao fechar cada checkpoint.** É o primeiro que o Claude lê ao
 > retomar o trabalho, e o que evita recomeçar o contexto do zero a cada sessão.
 
-**Última atualização:** 10/09/2026 — checkpoint 1.3 fechado
+**Última atualização:** 10/09/2026 — checkpoint 1.4 fechado
 
 ---
 
 ## Fase atual
 
-**🔵 Fase 1 — Esqueleto (3/5).** A API sobe, o banco roda no Compose, e o `/ingest` já aceita o contrato — mas **ainda não grava nada**.
+**🔵 Fase 1 — Esqueleto (4/5).** A API sobe, o banco roda no Compose, e o `/ingest` já aceita o contrato — mas **ainda não grava nada**.
 
 **✅ Fase 0 — Fundação documental: COMPLETA.** As decisões de domínio, dados, arquitetura,
 contratos e qualidade estão registradas, e as verificáveis foram verificadas contra ferramenta
@@ -52,6 +52,7 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 - [x] **`POST /api/v1/ingest`** validando o contrato, com Problem Details e `retryable`
 - [x] Domínio puro (`CanFrame`, `SessionId`) — 15 testes em **0,04 s**, sem Spring
 - [x] Teste de arquitetura (ArchUnit) fiscalizando o ADR-009
+- [x] **Testcontainers** — PostgreSQL 17 + TimescaleDB real na suíte, **um container para os 27 testes**
 
 ## O que NÃO existe ainda
 
@@ -66,25 +67,23 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 
 ## Próximo passo
 
-**Checkpoint 1.4 — primeiro teste com Testcontainers.**
+**Checkpoint 1.5 — gerador de dados sintéticos.** Último da Fase 1.
 
-**Aceite:** `./gradlew test` sobe um Postgres real (com TimescaleDB), conecta e passa. O teste
-falha se o container não subir — nunca cai em banco em memória por baixo ([ADR-003](02-decisoes-tecnicas.md)).
+Não é extra, é **pré-requisito** ([ADR-005](02-decisoes-tecnicas.md)): o carro não fica
+disponível para desenvolvimento, não está no laboratório de madrugada, e não está rodando quando
+o CI executa. Sem o gerador, nada é desenvolvível nem demonstrável.
 
-Cuidado que já está previsto no [`docs/09 §6`](09-estrategia-de-testes.md): **um container para a
-suíte inteira**, não um por classe de teste. Vinte classes com container próprio seriam vinte
-bootstraps.
-
-> ⚠️ **O `/ingest` responde 2xx sem persistir** (`framesStored: 0`). Não apontar firmware real
-> para ele até o checkpoint 2.5 — o ESP32 apaga o cartão ao ver 2xx, e o dado sumiria.
+**Aceite:** o gerador alimenta o `/ingest` por 60 s sem o carro presente — com curva de RPM
+plausível, temperatura subindo com o uso e GPS percorrendo um traçado. E sabe simular queda de
+conexão com reenvio do **mesmo** `batchId`, que é o cenário que o ADR-008 protege.
 
 ### Como rodar o que já existe
 
 ```bash
-docker compose up -d                       # sobe o banco
+docker compose up -d                       # sobe o banco (o health depende dele)
 ./gradlew bootRun                          # sobe a API
 curl localhost:8081/actuator/health        # {"status":"UP"}
-./gradlew test                             # 24 testes
+./gradlew test                             # 27 testes, sobe 1 container
 ```
 
 ### Pendência paralela do Heitor: levantar os sinais reais
