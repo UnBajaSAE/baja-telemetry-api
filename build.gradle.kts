@@ -78,6 +78,15 @@ kotlin {
 	}
 }
 
+/**
+ * O DBC mora em contracts/ porque e contrato compartilhado entre firmware, API e
+ * ferramentas de bancada -- nao e recurso da API (docs/05 §2). O build copia
+ * para o classpath para a aplicacao nao depender do diretorio de execucao.
+ */
+tasks.named<ProcessResources>("processResources") {
+	from("contracts/can") { into("can") }
+}
+
 tasks.withType<Test> {
 	useJUnitPlatform()
 }

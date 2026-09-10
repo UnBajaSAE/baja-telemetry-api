@@ -3,13 +3,13 @@
 > **Atualize este arquivo ao fechar cada checkpoint.** É o primeiro que o Claude lê ao
 > retomar o trabalho, e o que evita recomeçar o contexto do zero a cada sessão.
 
-**Última atualização:** 10/09/2026 — checkpoint 2.2 fechado
+**Última atualização:** 10/09/2026 — checkpoint 2.3 fechado
 
 ---
 
 ## Fase atual
 
-**🔵 Fase 2 — Modelo de dados e decodificador (2/6).** O schema existe e a hypertable já fatia sozinha.
+**🔵 Fase 2 — Modelo de dados e decodificador (3/6).** O schema existe, a hypertable fatia sozinha, e o mapa de sinais é lido do arquivo.
 
 **✅ Fase 1 — Esqueleto: COMPLETA (5/5).** A API sobe, o banco roda no Compose, e o `/ingest` já aceita o contrato — mas **ainda não grava nada**.
 
@@ -59,6 +59,8 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 - [x] **`FrameEncoder`** no domínio — bate byte a byte com o `cantools` nos três frames
 - [x] **Flyway** — `session`, `ingest_batch` e `signal_definition` no banco (V1, V2)
 - [x] **`raw_frame` como hypertable** (V3) — chunks de 1 dia, índices e compressão em 30 dias
+- [x] **Parser do DBC** — lê `contracts/can/unbaja.dbc`, falha alto no que não suporta
+- [x] **Zero sinais hardcodados** — a verdade voltou a morar só no arquivo (ADR-006)
 
 ## O que NÃO existe ainda
 
@@ -73,18 +75,20 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 
 ## Próximo passo
 
-**Checkpoint 2.3 — parser do DBC.**
+**Checkpoint 2.4 — o decodificador.** É o coração do sistema.
 
-**Aceite:** parseia `contracts/can/unbaja.dbc` produzindo 3 mensagens e 6 sinais; e **falha alto**
-diante de diretiva não suportada, em vez de ignorar em silêncio ([ADR-006](02-decisoes-tecnicas.md)).
+**Aceite:** teste de propriedade `decode(encode(x)) ≈ x` passando com centenas de casos aleatórios
+nos **três** frames — incluindo o sinal que cruza fronteira de byte e o signed. Mais: valor fora
+da faixa do DBC é marcado inválido, não descartado em silêncio.
 
-É o checkpoint que remove o `SinaisDoBaja` hardcodado: hoje as definições de sinal estão escritas
-à mão em Kotlin, espelhando o arquivo. Quando o parser existir, elas passam a ser **lidas** do
-`.dbc`, e a verdade volta a morar num lugar só.
+Metade do caminho já existe: o `FrameEncoder` (a ida) foi escrito no checkpoint 1.5 e bate byte a
+byte com o `cantools`. Falta a volta.
 
-O que fica fora do parser v1 está listado em [`docs/05 §5.2`](05-mapa-de-sinais.md): `VAL_`,
-multiplexação, `BA_` e CAN FD. Encontrar qualquer uma delas tem que derrubar a subida da
-aplicação — ignorar um `SG_` desconhecido perde um sinal inteiro sem ninguém notar.
+As duas propriedades e o porquê da tolerância estão em [`docs/09 §3`](09-estrategia-de-testes.md):
+`encode(decode(bits)) == bits` é exata, mas `decode(encode(x)) ≈ x` **não pode** usar igualdade —
+a tolerância sai da escala do sinal, lida do DBC.
+
+Ao mexer aqui, seguir a skill `revisar-decodificador`.
 
 > ⚠️ **O `/ingest` ainda responde 2xx sem persistir.** Não apontar firmware real até o 2.5.
 
@@ -92,9 +96,9 @@ aplicação — ignorar um `SG_` desconhecido perde um sinal inteiro sem ningué
 
 ```bash
 docker compose up -d                       # sobe o banco
-./gradlew bootRun                          # sobe a API na 8081 (aplica as migrations)
-./gradlew test                             # 47 testes
-./gradlew gerador                          # telemetria sintetica por 60s
+./gradlew bootRun                          # sobe a API na 8081
+./gradlew test                             # 63 testes
+./gradlew gerador                          # telemetria sintetica, ~119 frames/s
 ```
 
 ### Pendência paralela do Heitor: levantar os sinais reais

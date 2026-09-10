@@ -244,13 +244,18 @@ Onde procurar no firmware: os `#define` de máscara e deslocamento, os `struct` 
 
 ### 5.2 Fora de escopo do parser v1
 
-O DBC tem diretivas que **não** vamos suportar na primeira versão. O parser deve **falhar alto**
-ao encontrar qualquer uma delas, nunca ignorar em silêncio (ver ADR-006):
+O DBC tem diretivas que **não** são suportadas. ✅ **Implementado no checkpoint 2.3** — o parser
+**falha alto** ao encontrar qualquer uma delas, com o número da linha e o conteúdo na mensagem,
+e a aplicação não sobe:
 
 - `VAL_` — tabelas de enumeração (ex.: `gear`: 0 = neutro, 1 = primeira). O valor numérico basta por ora
 - `SG_MUL_VAL_` / multiplexação — um frame cujo conteúdo muda conforme um campo seletor
 - `BA_` — atributos customizados, incluindo ciclo de transmissão
-- Frames CAN FD e identificadores estendidos de 29 bits
+- Frames CAN FD (DLC acima de 8) e identificadores estendidos de 29 bits
+
+> O bloco `NS_` no topo do arquivo **lista** os nomes dessas diretivas como símbolos que o formato
+> conhece. O parser pula esse bloco de propósito: um parser ingênuo que falhasse ao "ver `VAL_`"
+> recusaria o próprio cabeçalho.
 
 ---
 
@@ -282,3 +287,8 @@ pipx run cantools dump contracts/can/unbaja.dbc
 `cantools` é ferramenta de bancada, **não** dependência do projeto — roda em venv efêmero e
 serve de segunda opinião independente do nosso próprio parser. Se os dois discordarem, um dos
 dois está errado, e é exatamente isso que se quer descobrir cedo.
+
+**A comparação está automatizada.** O `FrameEncoderTest` monta frames com os sinais que o **nosso**
+parser leu do arquivo, e compara byte a byte com a saída que o `cantools` produziu lendo o **mesmo**
+arquivo. São duas leituras independentes confrontadas: uma divergência de escala, de bit inicial ou
+de endianness aparece ali.

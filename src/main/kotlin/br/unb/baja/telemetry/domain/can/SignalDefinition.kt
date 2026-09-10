@@ -7,9 +7,8 @@ enum class ByteOrder { BIG, LITTLE }
 /**
  * A definicao de um sinal dentro de um frame: o conteudo de uma linha `SG_` do DBC.
  *
- * Na Fase 2 o parser de DBC passa a produzir estes objetos lendo
- * `contracts/can/unbaja.dbc`. Ate la eles sao montados a mao, espelhando o mesmo
- * arquivo -- ver `SinaisDoBaja`.
+ * Produzidos pelo `DbcParser` lendo `contracts/can/unbaja.dbc`. Nao existe
+ * versao escrita a mao destes objetos: a verdade mora no arquivo (ADR-006).
  */
 data class SignalDefinition(
     val name: String,

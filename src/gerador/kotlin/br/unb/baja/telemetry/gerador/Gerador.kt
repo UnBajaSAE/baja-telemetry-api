@@ -1,7 +1,7 @@
 package br.unb.baja.telemetry.gerador
 
 import br.unb.baja.telemetry.domain.can.FrameEncoder
-import br.unb.baja.telemetry.domain.can.SinaisDoBaja
+import br.unb.baja.telemetry.domain.can.dbc.DbcLoader
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -47,17 +47,26 @@ fun main(args: Array<String>) {
     if (reenviarACada > 0) println("  reenvio  : a cada $reenviarACada lotes, com o mesmo batchId")
     println()
 
+    // O mapa de sinais vem do arquivo, igual ao da API (ADR-006). Se o DBC
+    // mudar, o gerador acompanha sem ninguem editar codigo.
+    val dbc = DbcLoader.doClasspath()
+    println("  mapa     : DBC '${dbc.version}', ${dbc.messages.size} frames, ${dbc.signalCount} sinais")
+    println()
+
+    val idMotor = 0x100
+    val idDinamica = 0x200
+    val idGps = 0x300
+    fun sinal(canId: Int, nome: String) = checkNotNull(dbc.signal(canId, nome)) {
+        "o DBC nao tem o sinal '$nome' no frame 0x${canId.toString(16).uppercase()}"
+    }
+
     val carro = Carro()
     val cliente = ClienteIngest(url, sessao, device)
     val inicio = System.currentTimeMillis()
 
     // Taxas do docs/03. Note que os tres frames do DBC provisorio dao 125 msg/s;
     // o carro real, com quatro nos, fica na casa dos 500.
-    val taxas = listOf(
-        SinaisDoBaja.ID_MOTOR to 100,
-        SinaisDoBaja.ID_DINAMICA to 20,
-        SinaisDoBaja.ID_GPS to 5,
-    )
+    val taxas = listOf(idMotor to 100, idDinamica to 20, idGps to 5)
 
     var lote = mutableListOf<FramePronto>()
     var loteAberto = System.currentTimeMillis()
@@ -73,15 +82,22 @@ fun main(args: Array<String>) {
 
         for ((canId, hz) in taxas) {
             if (tick % (100L / hz) != 0L) continue
+            val dlc = checkNotNull(dbc.message(canId)).dlc
             val payload = when (canId) {
-                SinaisDoBaja.ID_MOTOR -> FrameEncoder.encode(
-                    8, mapOf(SinaisDoBaja.RPM to e.rpm, SinaisDoBaja.TEMP to e.tempMotor),
+                idMotor -> FrameEncoder.encode(
+                    dlc,
+                    mapOf(sinal(canId, "rpm") to e.rpm, sinal(canId, "temp") to e.tempMotor),
                 )
-                SinaisDoBaja.ID_DINAMICA -> FrameEncoder.encode(
-                    8, mapOf(SinaisDoBaja.SPEED to e.velocidade, SinaisDoBaja.GEAR to e.marcha.toDouble()),
+                idDinamica -> FrameEncoder.encode(
+                    dlc,
+                    mapOf(
+                        sinal(canId, "speed") to e.velocidade,
+                        sinal(canId, "gear") to e.marcha.toDouble(),
+                    ),
                 )
                 else -> FrameEncoder.encode(
-                    8, mapOf(SinaisDoBaja.LAT to e.lat, SinaisDoBaja.LON to e.lon),
+                    dlc,
+                    mapOf(sinal(canId, "lat") to e.lat, sinal(canId, "lon") to e.lon),
                 )
             }
             lote += FramePronto(agora, canId, payload.hex())
@@ -96,7 +112,11 @@ fun main(args: Array<String>) {
             cliente.enviar(lote, nLote, reenviar)
             totalFrames += lote.size
             lote = mutableListOf()
-            loteAberto = agora
+            // A janela do proximo lote comeca DEPOIS do envio, nao antes. O POST
+            // e sincrono: usar o instante anterior a ele faria a duracao da
+            // requisicao ser descontada da janela seguinte -- e um POST lento
+            // fecharia o lote seguinte com um punhado de frames.
+            loteAberto = System.currentTimeMillis()
         }
 
         tick++

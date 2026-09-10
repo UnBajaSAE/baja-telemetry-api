@@ -19,7 +19,7 @@ profundidade, não na quantidade de features.
 |---|---|---|---|
 | **0** | Fundação documental | 5 | ✅ **5/5** |
 | **1** | Esqueleto — sobe, recebe, testa | 5 | ✅ **5/5** |
-| **2** | Modelo de dados e decodificador | 6 | 🔵 2/6 |
+| **2** | Modelo de dados e decodificador | 6 | 🔵 3/6 |
 | **3** | Consulta | 4 | ⬜ 0/4 |
 | **4** | Robustez | 5 | ⬜ 0/5 |
 | **5** | Deploy e medição | 4 | ⬜ 0/4 |
@@ -160,9 +160,13 @@ retenção (apagar o cru quebraria o ADR-001).
 > Em Brasília isso cai às 21h — uma bateria noturna que atravesse esse horário ocupa dois chunks.
 > Não quebra nada, e o `docs/06 §4.3` foi corrigido.
 
-### ⬜ 2.3 · Parser do DBC
-**Aceite:** parseia `contracts/can/unbaja.dbc` produzindo 3 mensagens e 6 sinais; e **falha alto**
-diante de diretiva não suportada, em vez de ignorar (ADR-006).
+### ✅ 2.3 · Parser do DBC
+**Aceite:** lê `contracts/can/unbaja.dbc` produzindo 3 mensagens e 6 sinais, e **falha alto** em
+`VAL_`, `BA_`, multiplexação, identificador de 29 bits e DLC de CAN FD — cada erro com o número
+da linha e o conteúdo. 16 testes, rodando contra o arquivo de verdade.
+**Fechado em 10/09/2026.** Removeu o `SinaisDoBaja` escrito à mão: **zero** definições de sinal
+hardcodadas no repositório, a verdade voltou a morar só no `.dbc` (ADR-006). O build copia o
+arquivo para o classpath, e a aplicação recusa subir se ele estiver inválido.
 
 ### ⬜ 2.4 · Decodificador de frame
 **Aceite:** teste de propriedade `decode(encode(x)) ≈ x` passa com centenas de casos aleatórios
