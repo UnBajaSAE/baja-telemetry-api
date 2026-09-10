@@ -3,13 +3,13 @@
 > **Atualize este arquivo ao fechar cada checkpoint.** É o primeiro que o Claude lê ao
 > retomar o trabalho, e o que evita recomeçar o contexto do zero a cada sessão.
 
-**Última atualização:** 10/09/2026 — checkpoint 2.1 fechado
+**Última atualização:** 10/09/2026 — checkpoint 2.2 fechado
 
 ---
 
 ## Fase atual
 
-**🔵 Fase 2 — Modelo de dados e decodificador (1/6).** O schema começou a existir de verdade.
+**🔵 Fase 2 — Modelo de dados e decodificador (2/6).** O schema existe e a hypertable já fatia sozinha.
 
 **✅ Fase 1 — Esqueleto: COMPLETA (5/5).** A API sobe, o banco roda no Compose, e o `/ingest` já aceita o contrato — mas **ainda não grava nada**.
 
@@ -57,7 +57,8 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 - [x] **Testcontainers** — PostgreSQL 17 + TimescaleDB real na suíte, **um container para a suíte**
 - [x] **Gerador sintético** (`./gradlew gerador`) — 111 frames/s, curvas verificadas com `cantools`
 - [x] **`FrameEncoder`** no domínio — bate byte a byte com o `cantools` nos três frames
-- [x] **Flyway** — `session`, `ingest_batch` e `signal_definition` existem no banco (V1 e V2)
+- [x] **Flyway** — `session`, `ingest_batch` e `signal_definition` no banco (V1, V2)
+- [x] **`raw_frame` como hypertable** (V3) — chunks de 1 dia, índices e compressão em 30 dias
 
 ## O que NÃO existe ainda
 
@@ -72,25 +73,27 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 
 ## Próximo passo
 
-**Checkpoint 2.2 — `raw_frame` como hypertable.**
+**Checkpoint 2.3 — parser do DBC.**
 
-**Aceite:** `SELECT * FROM timescaledb_information.chunks` mostra chunks criados após inserir
-dado que cruze a janela configurada de 1 dia.
+**Aceite:** parseia `contracts/can/unbaja.dbc` produzindo 3 mensagens e 6 sinais; e **falha alto**
+diante de diretiva não suportada, em vez de ignorar em silêncio ([ADR-006](02-decisoes-tecnicas.md)).
 
-O DDL já está escrito e verificado em [`docs/06 §3.3`](06-modelo-de-dados.md), com as três
-surpresas do TimescaleDB documentadas: hypertable não aceita chave primária que não inclua a
-coluna de tempo, chave estrangeira custa uma verificação por linha inserida, e o tamanho do
-chunk é decisão de projeto.
+É o checkpoint que remove o `SinaisDoBaja` hardcodado: hoje as definições de sinal estão escritas
+à mão em Kotlin, espelhando o arquivo. Quando o parser existir, elas passam a ser **lidas** do
+`.dbc`, e a verdade volta a morar num lugar só.
 
-> ⚠️ **O `/ingest` ainda responde 2xx sem persistir.** Não apontar firmware real para ele até o
-> checkpoint 2.5.
+O que fica fora do parser v1 está listado em [`docs/05 §5.2`](05-mapa-de-sinais.md): `VAL_`,
+multiplexação, `BA_` e CAN FD. Encontrar qualquer uma delas tem que derrubar a subida da
+aplicação — ignorar um `SG_` desconhecido perde um sinal inteiro sem ninguém notar.
+
+> ⚠️ **O `/ingest` ainda responde 2xx sem persistir.** Não apontar firmware real até o 2.5.
 
 ### Como rodar o que já existe
 
 ```bash
 docker compose up -d                       # sobe o banco
 ./gradlew bootRun                          # sobe a API na 8081 (aplica as migrations)
-./gradlew test                             # 39 testes
+./gradlew test                             # 47 testes
 ./gradlew gerador                          # telemetria sintetica por 60s
 ```
 

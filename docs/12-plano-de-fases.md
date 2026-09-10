@@ -19,7 +19,7 @@ profundidade, não na quantidade de features.
 |---|---|---|---|
 | **0** | Fundação documental | 5 | ✅ **5/5** |
 | **1** | Esqueleto — sobe, recebe, testa | 5 | ✅ **5/5** |
-| **2** | Modelo de dados e decodificador | 6 | 🔵 1/6 |
+| **2** | Modelo de dados e decodificador | 6 | 🔵 2/6 |
 | **3** | Consulta | 4 | ⬜ 0/4 |
 | **4** | Robustez | 5 | ⬜ 0/5 |
 | **5** | Deploy e medição | 4 | ⬜ 0/4 |
@@ -148,9 +148,17 @@ telemetria sem o carro. **Nada é persistido ainda** — é o que a Fase 2 resol
 `ingest_batch` recusa o mesmo `batchId` duas vezes — a idempotência do ADR-008 é do banco, não
 de checagem no código. As hypertables entram na 2.2.
 
-### ⬜ 2.2 · `raw_frame` como hypertable
-**Aceite:** `SELECT * FROM timescaledb_information.chunks` mostra chunks criados após inserir
-dado que cruze a janela configurada.
+### ✅ 2.2 · `raw_frame` como hypertable
+**Aceite:** verificado contra o banco do Compose — dado de 22 a 24/08 gerou **três chunks**, um
+por dia, criados sozinhos; e o `EXPLAIN` de uma consulta escopada a um dia abre **um só**, pelo
+índice `idx_raw_session_time`.
+**Fechado em 10/09/2026.** Oito testes novos, incluindo os que provam que a ausência de chave
+primária e de chave estrangeira é **decisão** e não esquecimento, e que não existe política de
+retenção (apagar o cru quebraria o ADR-001).
+
+> **Achado ao implementar:** as fronteiras de chunk são alinhadas em **UTC**, não no fuso local.
+> Em Brasília isso cai às 21h — uma bateria noturna que atravesse esse horário ocupa dois chunks.
+> Não quebra nada, e o `docs/06 §4.3` foi corrigido.
 
 ### ⬜ 2.3 · Parser do DBC
 **Aceite:** parseia `contracts/can/unbaja.dbc` produzindo 3 mensagens e 6 sinais; e **falha alto**

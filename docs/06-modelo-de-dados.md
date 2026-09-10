@@ -254,6 +254,16 @@ casa das centenas de MB.
 
 Revisar se as sessões passarem a cruzar a meia-noite, ou se a taxa de amostragem subir.
 
+> ⚠️ **Descoberto ao implementar (checkpoint 2.2): a meia-noite que importa é a de UTC.** O
+> TimescaleDB alinha as fronteiras de chunk em UTC, não no fuso local. Em Brasília (−03) isso cai
+> às **21h locais** — então uma bateria noturna que atravesse esse horário ocupa dois chunks em
+> vez de um.
+>
+> Não quebra nada: a consulta abre dois chunks e responde igual, só rende um pouco menos. Mas o
+> raciocínio "uma sessão cabe num dia" da seção acima vale para o dia **UTC**, e é bom saber disso
+> antes de estranhar o número de chunks. Consultas a `timescaledb_information.chunks` precisam
+> converter explicitamente (`range_start AT TIME ZONE 'UTC'`), senão a data exibida vem deslocada.
+
 ---
 
 ## 5. Compressão e retenção
