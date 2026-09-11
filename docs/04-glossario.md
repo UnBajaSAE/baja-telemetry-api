@@ -99,8 +99,10 @@ disco, em vez de apontar linha a linha. Minúsculo, e eficiente quando o dado es
 ordenado pela coluna indexada — exatamente o caso de telemetria por timestamp.
 
 **Batch insert.** Inserir muitas linhas num comando só, em vez de um comando por linha.
-Elimina a latência de ida e volta repetida. Em JDBC exige `rewriteBatchedStatements=true`,
-senão o driver ignora o agrupamento em silêncio.
+Elimina a latência de ida e volta repetida. No driver do PostgreSQL exige
+**`reWriteBatchedInserts=true`** na URL — atenção ao nome, porque
+`rewriteBatchedStatements` é do **MySQL** e é ignorado em silêncio. Medido neste projeto:
+**13,9× mais rápido** que linha a linha (ver ADR-004).
 
 **Idempotência.** Propriedade de uma operação que, repetida, produz o mesmo resultado da
 primeira vez. Essencial aqui porque o ESP32 reenvia lote quando não sabe se foi entregue.

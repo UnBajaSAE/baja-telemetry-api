@@ -32,6 +32,12 @@ object PostgresDeTeste {
             .withDatabaseName("baja")
             .withUsername("baja")
             .withPassword("baja")
+            // A MESMA flag do application.properties. Sem isto o driver se
+            // comporta diferente no teste e em producao: com a flag ligada,
+            // batchUpdate devolve SUCCESS_NO_INFO em vez da contagem por linha.
+            // Um teste que roda com outra configuracao de driver da falsa
+            // confianca mesmo rodando contra um Postgres de verdade.
+            .withUrlParam("reWriteBatchedInserts", "true")
             .also { it.start() }
     }
 }

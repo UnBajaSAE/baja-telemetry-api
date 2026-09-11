@@ -86,8 +86,16 @@ bootstraps.
 
 ## 7. Armadilhas já conhecidas deste projeto
 
-**`rewriteBatchedStatements=true` na URL JDBC.** Sem essa flag o driver do Postgres **ignora o
-agrupamento em silêncio** e manda linha a linha. Não há erro; só fica lento.
+**`reWriteBatchedInserts=true` na URL JDBC** — e repare no nome. `rewriteBatchedStatements` é o
+parâmetro do **MySQL**, e o driver do Postgres o ignora em silêncio: sem erro, só lento.
+Medido: **13,9×** de diferença (ADR-004).
+
+**A flag muda o retorno de `batchUpdate`.** Com ela ligada o driver devolve `SUCCESS_NO_INFO`
+(−2) por linha em vez da contagem. Somar direto dá número negativo. Use o helper
+`linhasGravadas()` em `JdbcStores.kt`.
+
+**O container de teste precisa da MESMA URL da produção.** Banco real com driver configurado
+diferente ainda é falsa confiança — foi assim que o `framesStored: -4` passou pela suíte.
 
 **Hypertable não aceita chave primária que não inclua a coluna de tempo.** `raw_frame` e
 `signal_point` não têm PK, de propósito ([`docs/06 §4.1`](../../../docs/06-modelo-de-dados.md)).

@@ -35,23 +35,23 @@ class IngestControllerTest(
         postLote(
             """
             {
-              "batchId": "550e8400-e29b-41d4-a716-446655440000",
+              "batchId": "550e8400-e29b-41d4-a716-44665544aa00",
               "deviceId": "esp32-node-1",
               "sessionId": "2026-08-24-teste-suspensao",
               "frames": [
-                { "t": 1756041600123, "id": 256, "data": "3E805B0000000000" },
-                { "t": 1756041600133, "id": 256, "data": "3E925C0000000000" }
+                { "t": 1787572800000, "id": 256, "data": "3E805B0000000000" },
+                { "t": 1787572800010, "id": 256, "data": "3E925C0000000000" }
               ]
             }
             """,
         ).andExpect {
             status { isOk() }
-            jsonPath("\$.batchId") { value("550e8400-e29b-41d4-a716-446655440000") }
+            jsonPath("\$.batchId") { value("550e8400-e29b-41d4-a716-44665544aa00") }
             jsonPath("\$.framesReceived") { value(2) }
             jsonPath("\$.framesRejected") { value(0) }
             jsonPath("\$.duplicate") { value(false) }
-            // Checkpoint 1.3 ainda nao persiste. Vira 2 na Fase 2.
-            jsonPath("\$.framesStored") { value(0) }
+            // A partir do checkpoint 2.5 o lote e realmente gravado.
+            jsonPath("\$.framesStored") { value(2) }
         }
     }
 
@@ -64,9 +64,9 @@ class IngestControllerTest(
               "deviceId": "esp32-node-1",
               "sessionId": "2026-08-24-teste-suspensao",
               "frames": [
-                { "t": 1756041600123, "id": 256, "data": "3E805B0000000000" },
-                { "t": 1756041600133, "id": 256, "data": "3E805B000000000" },
-                { "t": 1756041600143, "id": 256, "data": "A1B2" }
+                { "t": 1787572800000, "id": 256, "data": "3E805B0000000000" },
+                { "t": 1787572800010, "id": 256, "data": "3E805B000000000" },
+                { "t": 1787572800020, "id": 256, "data": "A1B2" }
               ]
             }
             """,

@@ -19,7 +19,7 @@ profundidade, não na quantidade de features.
 |---|---|---|---|
 | **0** | Fundação documental | 5 | ✅ **5/5** |
 | **1** | Esqueleto — sobe, recebe, testa | 5 | ✅ **5/5** |
-| **2** | Modelo de dados e decodificador | 6 | 🔵 4/6 |
+| **2** | Modelo de dados e decodificador | 6 | 🔵 5/6 |
 | **3** | Consulta | 4 | ⬜ 0/4 |
 | **4** | Robustez | 5 | ⬜ 0/5 |
 | **5** | Deploy e medição | 4 | ⬜ 0/4 |
@@ -180,10 +180,16 @@ nunca zero, que seria confundido com leitura real.
 > num valor errado. Quem pegou foi a comparação com o `cantools`. Registrado em
 > [`docs/09 §3.4`](09-estrategia-de-testes.md).
 
-### ⬜ 2.5 · Persistência em lote
-**Aceite:** medir inserção linha a linha versus em lote e registrar os dois números. Confirmar
-que `rewriteBatchedStatements=true` está ativo — sem a flag o driver ignora o batch em silêncio
-(ADR-004).
+### ✅ 2.5 · Persistência em lote
+**Aceite:** medido com 5.000 linhas — linha a linha 1.854 ms, em lote sem a flag 769 ms, **em
+lote com a flag 133 ms** (13,9× mais rápido). O gerador rodou 30 s e gravou 3.450 frames crus e
+6.900 pontos de sinal, com todos os lotes marcados como decodificados.
+**Fechado em 10/09/2026.** O `/ingest` finalmente persiste.
+
+> **Dois achados.** O ADR-004 trazia `rewriteBatchedStatements`, que é o parâmetro do **MySQL** —
+> o driver do Postgres o ignora em silêncio. E a flag correta muda o retorno de `batchUpdate`
+> para `SUCCESS_NO_INFO`, o que fez a API responder `framesStored: -4`. O teste não pegou porque
+> o container subia **sem** a flag: banco real, driver diferente.
 
 ### ⬜ 2.6 · Idempotência ponta a ponta
 **Aceite:** enviar o mesmo lote duas vezes devolve 200 com `duplicate: true` na segunda, e

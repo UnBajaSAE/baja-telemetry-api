@@ -29,8 +29,8 @@ X-API-Key: <chave do dispositivo>
   "deviceId": "esp32-node-1",
   "sessionId": "2026-08-24-teste-suspensao",
   "frames": [
-    { "t": 1756041600123, "id": 256, "data": "3E805B0000000000" },
-    { "t": 1756041600133, "id": 256, "data": "3E925C0000000000" }
+    { "t": 1787572800000, "id": 256, "data": "3E805B0000000000" },
+    { "t": 1787572800010, "id": 256, "data": "3E925C0000000000" }
   ]
 }
 ```

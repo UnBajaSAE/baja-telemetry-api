@@ -3,13 +3,13 @@
 > **Atualize este arquivo ao fechar cada checkpoint.** É o primeiro que o Claude lê ao
 > retomar o trabalho, e o que evita recomeçar o contexto do zero a cada sessão.
 
-**Última atualização:** 10/09/2026 — checkpoint 2.4 fechado
+**Última atualização:** 10/09/2026 — checkpoint 2.5 fechado
 
 ---
 
 ## Fase atual
 
-**🔵 Fase 2 — Modelo de dados e decodificador (4/6).** O coração do sistema existe: os bytes já viram grandeza física. Falta gravar.
+**🔵 Fase 2 — Modelo de dados e decodificador (5/6).** **O sistema grava.** O dado do carro entra pelo `/ingest`, é decodificado e fica no banco.
 
 **✅ Fase 1 — Esqueleto: COMPLETA (5/5).** A API sobe, o banco roda no Compose, e o `/ingest` já aceita o contrato — mas **ainda não grava nada**.
 
@@ -62,6 +62,8 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 - [x] **Parser do DBC** — lê `contracts/can/unbaja.dbc`, falha alto no que não suporta
 - [x] **Zero sinais hardcodados** — a verdade voltou a morar só no arquivo (ADR-006)
 - [x] **Decodificador** — duas propriedades + as três armadilhas, provado capaz de falhar
+- [x] **Persistência em lote** (V4) — o `/ingest` grava cru e decodificado, numa transação
+- [x] **13,9× medido** entre inserção em lote e linha a linha
 
 ## O que NÃO existe ainda
 
@@ -69,33 +71,37 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 
 - [ ] **DBC com os sinais reais** — o atual é fictício (ver abaixo)
 - [ ] Gerador de dados sintéticos
-- [ ] Persistência: nada é gravado ainda (`framesStored` é sempre 0)
-- [ ] Decodificador, parser DBC, Flyway, gerador sintético
+- [ ] Consulta: não há endpoint para ler o que foi gravado (Fase 3)
+- [ ] API key, rate limiting, deploy (Fases 4 e 5)
 
 ---
 
 ## Próximo passo
 
-**Checkpoint 2.5 — persistência em lote.** É aqui que o `/ingest` **finalmente grava**.
+**Checkpoint 2.6 — idempotência ponta a ponta.** Último da Fase 2.
 
-**Aceite:** medir inserção linha a linha versus em lote e registrar os dois números. Confirmar
-que `rewriteBatchedStatements=true` está ativo — sem a flag o driver ignora o agrupamento em
-silêncio ([ADR-004](02-decisoes-tecnicas.md)).
+**Aceite:** enviar o mesmo lote duas vezes devolve 200 com `duplicate: true` na segunda, e
+`SELECT count(*)` prova que nada duplicou.
 
-Precisa também da tabela `signal_point` (migration V4) e do fluxo completo do
-[`docs/07 §4`](07-arquitetura-do-codigo.md): grava o cru, decodifica, grava os sinais, marca
-`decoded_at`, commita.
-
-> ⚠️ **Depois deste checkpoint o aviso sai:** o `/ingest` passa a persistir, e `framesStored`
-> deixa de ser 0. Até lá, não apontar firmware real para ele.
+O mecanismo já existe — o `JdbcIngestBatchStore` usa `ON CONFLICT DO NOTHING` e devolve `false`
+quando o `batchId` repete. Falta o teste de ponta a ponta, e rodar o gerador com `--reenviar`
+para ver o aviso dele **parar de aparecer**: hoje ele denuncia que os frames entraram duas vezes
+e a API não percebeu.
 
 ### Como rodar o que já existe
 
 ```bash
 docker compose up -d                       # sobe o banco
 ./gradlew bootRun                          # sobe a API na 8081
-./gradlew test                             # 73 testes
-./gradlew gerador                          # telemetria sintetica, ~119 frames/s
+./gradlew test                             # 74 testes
+./gradlew gerador                          # telemetria sintetica -- agora GRAVA
+```
+
+Para ver o que foi gravado:
+
+```sql
+SELECT signal_name, count(*), round(avg(value)::numeric, 1) AS media
+FROM signal_point GROUP BY signal_name ORDER BY 1;
 ```
 
 ### Pendência paralela do Heitor: levantar os sinais reais

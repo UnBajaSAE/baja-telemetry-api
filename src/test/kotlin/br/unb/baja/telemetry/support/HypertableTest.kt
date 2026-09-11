@@ -22,6 +22,9 @@ class HypertableTest(
 
     private val sessao = "2026-08-22-hypertable"
 
+    // Os literais de tempo levam o fuso EXPLICITO. Sem o `+00`, o Postgres
+    // interpreta na zona da sessao (Brasilia, -03) e desloca a janela em 3h --
+    // o suficiente para o chunk das 00:00 UTC ficar de fora do filtro.
     private fun semear(de: String, ate: String, passo: String = "6 hours"): Int {
         jdbc.update("INSERT INTO session (id) VALUES (?) ON CONFLICT DO NOTHING", sessao)
         val lote = UUID.randomUUID()
@@ -67,14 +70,19 @@ class HypertableTest(
      */
     @Test
     fun `dado cruzando dias cria um chunk por dia, sozinho`() {
-        val linhas = semear("2026-08-22", "2026-08-24")
+        val linhas = semear("2026-08-22 00:00+00", "2026-08-24 00:00+00")
         assertTrue(linhas > 0, "nada foi inserido")
 
+        // A janela e explicita porque outros testes tambem gravam em raw_frame
+        // desde que o /ingest passou a persistir (checkpoint 2.5). Contar TODOS
+        // os chunks tornaria este teste dependente da ordem de execucao.
         val chunks = jdbc.queryForList(
             """
             SELECT (range_start AT TIME ZONE 'UTC')::date::text AS dia
             FROM timescaledb_information.chunks
             WHERE hypertable_name = 'raw_frame'
+              AND range_start >= '2026-08-22 00:00+00'::timestamptz
+              AND range_end   <= '2026-08-25 00:00+00'::timestamptz
             ORDER BY range_start
             """,
         ).map { it["dia"] as String }
@@ -84,12 +92,13 @@ class HypertableTest(
 
     @Test
     fun `o planejador abre so o chunk do dia consultado`() {
-        semear("2026-08-22", "2026-08-24")
+        semear("2026-08-22 00:00+00", "2026-08-24 00:00+00")
 
         val plano = jdbc.queryForList(
             """
             EXPLAIN SELECT count(*) FROM raw_frame
-            WHERE session_id = ? AND frame_time >= '2026-08-24' AND frame_time < '2026-08-25'
+            WHERE session_id = ?
+              AND frame_time >= '2026-08-24 00:00+00' AND frame_time < '2026-08-25 00:00+00'
             """,
             sessao,
         ).joinToString("\n") { it.values.first().toString() }

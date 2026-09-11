@@ -145,7 +145,28 @@ cliente. Lote já processado é reconhecido e ignorado.
 
 **Batch insert obrigatório.** Mil `INSERT` separados é ordem de grandeza mais lento que um comando
 com mil linhas, porque cada ida e volta paga latência de rede. Requer
-`rewriteBatchedStatements=true` no JDBC — sem essa flag o driver ignora o batch silenciosamente.
+**`reWriteBatchedInserts=true`** na URL JDBC — sem a flag o driver não funde os comandos.
+
+> ⚠️ **Correção (checkpoint 2.5).** Este ADR trazia `rewriteBatchedStatements=true`, que é o
+> parâmetro do **MySQL**. O driver do PostgreSQL usa `reWriteBatchedInserts` e **ignora em
+> silêncio** o nome errado — a ironia é que seguir o texto original produziria exatamente o
+> problema que ele descreve. Medido com 5.000 linhas em `raw_frame`:
+>
+> | Como | Tempo | Taxa |
+> |---|---|---|
+> | Linha a linha | 1.854 ms | 2.696 linhas/s |
+> | Em lote, sem a flag | 769 ms | 6.501 linhas/s |
+> | **Em lote, com `reWriteBatchedInserts`** | **133 ms** | **37.593 linhas/s** |
+> | Em lote, com o nome do MySQL | 751 ms | 6.657 linhas/s ← idêntico a "sem a flag" |
+>
+> Em lote com a flag é **13,9×** mais rápido que linha a linha; a flag sozinha responde por
+> **5,8×** disso. O benchmark está em `BatchInsertBenchmarkTest`.
+
+**A flag muda o retorno de `batchUpdate`.** Ao fundir os comandos, o driver perde a contagem por
+linha e devolve `SUCCESS_NO_INFO` (−2) para cada uma. Somar direto produz número negativo — foi o
+que aconteceu aqui, e a API chegou a responder `framesStored: -4` para 2 frames. O teste não pegou
+porque o container do Testcontainers subia **sem** a flag: banco real, driver configurado
+diferente. Hoje o container usa a mesma URL da produção.
 
 **Idempotência.** A conexão cai no meio do envio; o ESP32 não sabe se o servidor recebeu e
 reenvia. Sem proteção, duplica-se meia sessão. Resolvido com `batchId` único e `ON CONFLICT DO

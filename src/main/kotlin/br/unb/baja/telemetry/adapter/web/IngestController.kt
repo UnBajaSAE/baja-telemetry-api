@@ -36,6 +36,7 @@ class IngestController(
             ?: throw InvalidSessionIdException(req.sessionId)
 
         val outcome = ingestService.ingest(
+            batchId = req.batchId,
             sessionId = sessionId,
             deviceId = req.deviceId,
             frames = req.frames.map { IncomingFrame(it.t, it.id, it.data) },
