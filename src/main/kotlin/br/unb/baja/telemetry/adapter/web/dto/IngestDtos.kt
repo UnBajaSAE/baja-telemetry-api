@@ -77,3 +77,25 @@ data class SignalSummaryDto(
     val count: Long,
     val invalidCount: Long,
 )
+
+/** Resposta de `GET /api/v1/sessions/{id}/metrics`. */
+data class MetricsDto(
+    val sessionId: String,
+    val signal: String,
+    val unit: String?,
+    /** A janela efetivamente usada, normalizada (ex.: "60s" vira "1m"). */
+    val bucket: String,
+    val from: String,
+    val to: String,
+    val points: List<MetricPointDto>,
+)
+
+data class MetricPointDto(
+    val bucket: String,
+    /** Nulos quando a janela só teve leituras inválidas. */
+    val min: Double?,
+    val max: Double?,
+    val avg: Double?,
+    val count: Long,
+    val invalidCount: Long,
+)

@@ -110,8 +110,8 @@ inteira — **é o agregado contínuo.**
 | Métrica | Alvo | Situação hoje |
 |---|---|---|
 | `GET /sessions/{id}/summary` | ≤ 200 ms | ✅ **~70 ms** medido no endpoint real, com 18 M pontos |
-| `GET /metrics`, janela ≤ 15 min | ≤ 100 ms | ✅ 38 ms |
-| `GET /metrics`, sessão inteira | ≤ 500 ms | ✅ 3,8 ms **com** agregado · ❌ 6.899 ms sem |
+| `GET /metrics`, janela ≤ 15 min | ≤ 100 ms | ✅ **24 ms** medido no endpoint (900 pontos) |
+| `GET /metrics`, sessão inteira | ≤ 500 ms | ✅ **241 ms** medido no endpoint (14.400 pontos) |
 | `GET /sessions` (lista) | ≤ 100 ms | ✅ **7 ms** com 2,16 M frames no banco — ver abaixo |
 
 ### 2.5 A listagem de sessões — e por que ela é barata
@@ -129,8 +129,34 @@ O número não vem de otimização de consulta, e sim de **onde o agregado mora*
 E a diferença cresce: `raw_frame` acompanha a temporada, `ingest_batch` acompanha o número de
 lotes. Ver [ADR-011](02-decisoes-tecnicas.md).
 
-**Como medir:** `\timing on` no `psql` contra dado do gerador sintético, e depois `EXPLAIN
-(ANALYZE, BUFFERS)` em qualquer consulta que estourar a meta.
+### 2.6 Medir o endpoint, não só a consulta
+
+O checkpoint 3.3 mostrou que as duas coisas são bem diferentes, e que medir só a consulta engana.
+
+Para a série da sessão inteira (14.400 pontos):
+
+| O quê | Tempo |
+|---|---|
+| A consulta no Postgres | 107 ms |
+| O endpoint completo | **241 ms** (mediana) |
+
+Os ~130 ms de diferença são **serialização e transferência**: 14.400 objetos de seis campos viram
+1,6 MB de JSON. O tempo cresce com o número de pontos, não com o trabalho do banco — 900 pontos
+respondem em 24 ms com a mesma consulta por baixo.
+
+**Duas consequências práticas.**
+
+A resposta é comprimida (`server.compression.enabled`). JSON com os mesmos seis nomes de campo
+repetidos milhares de vezes comprime **11×** — 1,6 MB viram 144 KB. Importa pouco em localhost e
+muito no caso real: alguém no box puxando o gráfico pelo WiFi da equipe.
+
+**As primeiras chamadas depois da aplicação subir são 2 a 4× mais lentas** (833 ms contra 241 ms),
+porque o JIT ainda não aqueceu. Medição que não descarta as primeiras execuções reporta um número
+que não existe em regime.
+
+**Como medir:** `\timing on` no `psql` para isolar a consulta, `curl -w '%{time_total}'` repetido
+para o endpoint — **descartando as primeiras chamadas** — e `EXPLAIN (ANALYZE, BUFFERS)` em
+qualquer consulta que estourar a meta.
 
 ---
 

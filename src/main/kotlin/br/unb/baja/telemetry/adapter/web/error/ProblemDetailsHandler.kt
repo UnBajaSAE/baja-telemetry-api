@@ -15,6 +15,18 @@ class BatchTooLargeException(val actual: Int, val max: Int) :
 /** Sessao inexistente. Vira 404. */
 class SessionNotFoundException(val id: String) : RuntimeException("sessao '$id' nao existe")
 
+/** Janela de agregacao invalida. Vira 422. */
+class InvalidBucketException(val pedido: String) :
+    RuntimeException("janela '$pedido' invalida")
+
+/** Sinal que nao existe no DBC vigente. Vira 422, com a lista do que existe. */
+class UnknownSignalException(val pedido: String, val conhecidos: List<String>) :
+    RuntimeException("sinal '$pedido' nao existe no DBC")
+
+/** A consulta devolveria pontos demais. Vira 422, sugerindo janela maior. */
+class TooManyPointsException(val estimado: Long, val maximo: Int, val sugestao: String) :
+    RuntimeException("$estimado pontos, maximo $maximo")
+
 /** sessionId fora do formato AAAA-MM-DD-slug (ADR-007). Vira 422. */
 class InvalidSessionIdException(val raw: String) :
     RuntimeException("sessionId '$raw' fora do formato AAAA-MM-DD-slug")
@@ -74,6 +86,40 @@ class ProblemDetailsHandler {
             "Nenhuma sessao com id '${e.id}'. Use GET /api/v1/sessions para ver as existentes.",
             // Consulta, nao ingestao: o `retryable` aqui e para o cliente de
             // leitura. Retentar a mesma URL nao vai fazer a sessao aparecer.
+            retryable = false,
+        )
+
+    @ExceptionHandler(InvalidBucketException::class)
+    fun invalidBucket(e: InvalidBucketException): ProblemDetail =
+        problem(
+            HttpStatus.UNPROCESSABLE_CONTENT,
+            "invalid-bucket",
+            "Janela de agregacao invalida",
+            "'${e.pedido}' nao serve. Use segundos inteiros, no minimo 1s -- por exemplo " +
+                "1s, 30s, 5m ou 1h. O agregado e de 1 segundo, entao janela menor que isso " +
+                "nao tem resposta possivel.",
+            retryable = false,
+        )
+
+    @ExceptionHandler(UnknownSignalException::class)
+    fun unknownSignal(e: UnknownSignalException): ProblemDetail =
+        problem(
+            HttpStatus.UNPROCESSABLE_CONTENT,
+            "unknown-signal",
+            "Sinal desconhecido",
+            "'${e.pedido}' nao esta no mapa de sinais vigente. Existem: " +
+                e.conhecidos.joinToString(", ") + ".",
+            retryable = false,
+        )
+
+    @ExceptionHandler(TooManyPointsException::class)
+    fun tooManyPoints(e: TooManyPointsException): ProblemDetail =
+        problem(
+            HttpStatus.UNPROCESSABLE_CONTENT,
+            "too-many-points",
+            "Intervalo grande demais para esta janela",
+            "A consulta devolveria ~${e.estimado} pontos, acima do limite de ${e.maximo}. " +
+                "Aumente a janela (tente bucket=${e.sugestao}) ou reduza o intervalo.",
             retryable = false,
         )
 

@@ -107,17 +107,23 @@ paths:
           schema: { type: string, format: date-time }
         - name: bucket
           in: query
-          description: Janela de agregacao (time_bucket do TimescaleDB)
-          schema: { type: string, default: 1s, example: 1s }
+          description: |
+            Janela de agregacao. Segundos inteiros, no minimo 1s -- o agregado continuo
+            e de 1 segundo, entao janela menor NAO TEM resposta possivel e devolve 422.
+            Aceita sufixo s, m ou h. Janela maior reagrupa as de 1s.
+          schema: { type: string, default: 1s, example: 5s }
       responses:
         '200':
-          description: Pontos agregados
+          description: Serie temporal agregada
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: '#/components/schemas/MetricPoint' }
+              schema: { $ref: '#/components/schemas/Metrics' }
         '404': { $ref: '#/components/responses/Problem' }
+        '422':
+          $ref: '#/components/responses/Problem'
+          description: |
+            bucket invalido (`invalid-bucket`), sinal fora do DBC (`unknown-signal`)
+            ou intervalo grande demais para a janela (`too-many-points`)
 
 components:
 
@@ -289,10 +295,41 @@ components:
           description: Pontos fora da faixa do DBC. Gravados e marcados, nao descartados
           example: 0
 
+    Metrics:
+      type: object
+      required: [sessionId, signal, bucket, from, to, points]
+      properties:
+        sessionId: { type: string }
+        signal:    { type: string, example: rpm }
+        unit:      { type: string, nullable: true, example: rpm }
+        bucket:
+          type: string
+          description: A janela efetivamente usada, normalizada -- "60s" volta como "1m"
+          example: 1m
+        from:   { type: string, format: date-time }
+        to:     { type: string, format: date-time }
+        points:
+          type: array
+          items: { $ref: '#/components/schemas/MetricPoint' }
+
     MetricPoint:
       type: object
+      required: [bucket, count, invalidCount]
       properties:
         bucket: { type: string, format: date-time }
-        avg:    { type: number }
-        min:    { type: number }
-        max:    { type: number }
+        min:
+          type: number
+          nullable: true
+          description: |
+            Estatisticas cobrem SO leituras dentro da faixa do DBC. Nulas quando a
+            janela inteira foi invalida -- zero seria confundido com leitura real.
+        max: { type: number, nullable: true }
+        avg:
+          type: number
+          nullable: true
+          description: Media PONDERADA pelo numero de leituras validas de cada janela de 1s
+        count:
+          type: integer
+          format: int64
+          description: Leituras na janela, INCLUINDO as invalidas
+        invalidCount: { type: integer, format: int64 }

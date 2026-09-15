@@ -30,9 +30,31 @@ data class SignalSummary(
     val invalidCount: Long,
 )
 
+/** Um ponto da serie temporal agregada. */
+data class MetricPoint(
+    val bucket: Instant,
+    /** Nulos quando a janela so teve leituras invalidas. */
+    val min: Double?,
+    val max: Double?,
+    val avg: Double?,
+    val count: Long,
+    val invalidCount: Long,
+)
+
 interface SessionQuery {
     fun listar(): List<SessionSummary>
 
     /** Null se a sessao nao existe -- diferente de existir e estar vazia. */
     fun resumo(sessionId: String): List<SignalSummary>?
+
+    /** A janela de tempo coberta por uma sessao, ou null se ela nao existe. */
+    fun intervalo(sessionId: String): Pair<Instant, Instant>?
+
+    fun metricas(
+        sessionId: String,
+        signal: String,
+        de: Instant,
+        ate: Instant,
+        janelaSegundos: Long,
+    ): List<MetricPoint>
 }

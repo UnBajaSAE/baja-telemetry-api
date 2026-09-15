@@ -20,7 +20,7 @@ profundidade, não na quantidade de features.
 | **0** | Fundação documental | 5 | ✅ **5/5** |
 | **1** | Esqueleto — sobe, recebe, testa | 5 | ✅ **5/5** |
 | **2** | Modelo de dados e decodificador | 6 | ✅ **6/6** |
-| **3** | Consulta | 4 | 🔵 2/4 |
+| **3** | Consulta | 4 | 🔵 3/4 |
 | **4** | Robustez | 5 | ⬜ 0/5 |
 | **5** | Deploy e medição | 4 | ⬜ 0/4 |
 
@@ -234,9 +234,22 @@ colocava no 3.3, mas a medição mostrou que o resumo já precisava dele ([ADR-0
 > recentes — dado recém-gravado ficaria invisível por até um minuto. E a janela da política
 > precisou de 8 dias, não 1, porque o `docs/03` aceita frames com até 7 dias e o ADR-004 diz que
 > eles chegam fora de ordem.
-### ⬜ 3.3 · `GET /sessions/{id}/metrics` — agregação por janela com `time_bucket`
-⚠️ **Exige agregado contínuo** — decidido por medição, não por preferência ([`docs/10 §2.2`](10-requisitos-nao-funcionais.md)).
-**Aceite:** sessão inteira em janelas de 1 s dentro de 500 ms; resumo da sessão dentro de 200 ms.
+### ✅ 3.3 · `GET /sessions/{id}/metrics` — agregação por janela com `time_bucket`
+**Aceite:** medido no endpoint, com uma prova de enduro de 18 M pontos no banco —
+sessão inteira em janelas de 1 s (14.400 pontos) em **241 ms** (meta: 500 ms), e janela de 15 min
+em **24 ms** (meta: 100 ms).
+**Fechado em 15/09/2026.** 106 testes.
+
+> **Três coisas que a medição ensinou.** O gargalo não é o banco: a consulta custa 107 ms e o
+> endpoint 241 — a diferença é serializar 1,6 MB de JSON. Compressão HTTP corta isso 11×. E as
+> primeiras chamadas depois da subida são 2 a 4× mais lentas por causa do JIT: medir sem descartar
+> o aquecimento reporta um número que não existe em regime.
+
+> **Recusas explícitas, em vez de resultado silenciosamente errado:** `bucket` menor que 1 s não
+> tem resposta possível (o agregado é de 1 s) e vira 422; sinal com erro de digitação vira 422
+> dizendo quais existem, em vez de lista vazia; intervalo grande demais vira 422 sugerindo a
+> janela adequada.
+
 ### ⬜ 3.4 · Paginação por cursor
 **Aceite:** demonstrar que o tempo da página não cresce com a profundidade — o que aconteceria
 com `OFFSET`.

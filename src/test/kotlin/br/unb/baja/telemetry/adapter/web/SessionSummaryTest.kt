@@ -120,7 +120,7 @@ class SessionSummaryTest(
     }
 
     @Test
-    fun `ponto fora da faixa do DBC entra como invalido, sem sumir da contagem`() {
+    fun `ponto fora de faixa e contado, mas NAO contamina a estatistica`() {
         val s = sessao("d")
         val t0 = Instant.parse("2026-08-24T11:00:00Z").toEpochMilli()
         // 0xFFFF em rpm = 16.383,75, acima do maximo de 8.000 do DBC
@@ -131,9 +131,16 @@ class SessionSummaryTest(
         )
 
         val r = assertNotNull(porSinal(s.value)["rpm"])
-        assertEquals(2L, (r["count"] as Number).toLong(), "o ponto invalido continua contando")
+        // O ponto continua GRAVADO e CONTADO: saber que o sensor caiu e informacao.
+        assertEquals(2L, (r["count"] as Number).toLong())
         assertEquals(1L, (r["invalidCount"] as Number).toLong())
-        assertTrue((r["max"] as Number).toDouble() > 8000, "o valor fora de faixa e preservado")
+        // Mas ele nao entra no maximo. "RPM maximo 16.383" para um motor que nao
+        // passa de 8.000 nao e informacao extra, e informacao errada (V7).
+        assertEquals(
+            3000.0, (r["max"] as Number).toDouble(),
+            "o maximo deveria ser a unica leitura valida, nao o espeto do sensor",
+        )
+        assertEquals(3000.0, (r["avg"] as Number).toDouble(), "a media so pondera o que e valido")
     }
 
     @Test

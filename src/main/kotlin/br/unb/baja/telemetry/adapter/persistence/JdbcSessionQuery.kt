@@ -2,10 +2,13 @@ package br.unb.baja.telemetry.adapter.persistence
 
 import br.unb.baja.telemetry.application.port.SessionQuery
 import br.unb.baja.telemetry.application.port.SessionSummary
+import br.unb.baja.telemetry.application.port.MetricPoint
 import br.unb.baja.telemetry.application.port.SignalSummary
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
+import java.sql.Timestamp
+import java.time.Instant
 
 @Repository
 class JdbcSessionQuery(private val jdbc: JdbcTemplate) : SessionQuery {
@@ -56,11 +59,13 @@ class JdbcSessionQuery(private val jdbc: JdbcTemplate) : SessionQuery {
             """
             SELECT signal_name,
                    can_id,
-                   min(min_value)                    AS minimo,
-                   max(max_value)                    AS maximo,
-                   sum(sum_value) / nullif(sum(n),0) AS media,
-                   sum(n)                            AS pontos,
-                   sum(n_invalid)                    AS invalidos
+                   min(min_value)                          AS minimo,
+                   max(max_value)                          AS maximo,
+                   -- Ponderada por n_valid, nao por n: os invalidos nao entram
+                   -- na soma, entao nao podem entrar no divisor (V7).
+                   sum(sum_value) / nullif(sum(n_valid), 0) AS media,
+                   sum(n)                                   AS pontos,
+                   sum(n) - sum(n_valid)                    AS invalidos
               FROM signal_1s
              WHERE session_id = ?
              GROUP BY signal_name, can_id
@@ -80,6 +85,61 @@ class JdbcSessionQuery(private val jdbc: JdbcTemplate) : SessionQuery {
             sessionId,
         )
     }
+
+    override fun intervalo(sessionId: String): Pair<Instant, Instant>? = jdbc.query(
+        """
+        SELECT min(first_frame_at) AS de, max(last_frame_at) AS ate
+          FROM ingest_batch WHERE session_id = ?
+        """,
+        { rs, _ ->
+            val de = rs.getTimestamp("de")?.toInstant()
+            val ate = rs.getTimestamp("ate")?.toInstant()
+            if (de != null && ate != null) de to ate else null
+        },
+        sessionId,
+    ).firstOrNull()
+
+    /**
+     * Serie temporal agregada por janela, lida do agregado continuo (ADR-012).
+     *
+     * A janela pedida e REAGRUPADA sobre as janelas de 1 s: `time_bucket` sobre
+     * a coluna `bucket`, somando as somas e as contagens. Por isso ela precisa
+     * ser multipla de 1 s -- reagrupar 1 s em janelas de 2,5 s desalinharia as
+     * bordas, e o `Bucket` recusa isso antes de chegar aqui.
+     */
+    override fun metricas(
+        sessionId: String,
+        signal: String,
+        de: Instant,
+        ate: Instant,
+        janelaSegundos: Long,
+    ): List<MetricPoint> = jdbc.query(
+        """
+        SELECT time_bucket(make_interval(secs => ?), bucket)  AS janela,
+               min(min_value)                                 AS minimo,
+               max(max_value)                                 AS maximo,
+               sum(sum_value) / nullif(sum(n_valid), 0)       AS media,
+               sum(n)                                         AS pontos,
+               sum(n) - sum(n_valid)                          AS invalidos
+          FROM signal_1s
+         WHERE session_id = ? AND signal_name = ?
+           AND bucket >= ? AND bucket < ?
+         GROUP BY janela
+         ORDER BY janela
+        """,
+        { rs, _ ->
+            MetricPoint(
+                bucket = rs.getTimestamp("janela").toInstant(),
+                min = rs.getObject("minimo")?.let { (it as Number).toDouble() },
+                max = rs.getObject("maximo")?.let { (it as Number).toDouble() },
+                avg = rs.getObject("media")?.let { (it as Number).toDouble() },
+                count = rs.getLong("pontos"),
+                invalidCount = rs.getLong("invalidos"),
+            )
+        },
+        janelaSegundos.toDouble(), sessionId, signal,
+        Timestamp.from(de), Timestamp.from(ate),
+    )
 
     private fun mapear(rs: ResultSet, @Suppress("UNUSED_PARAMETER") linha: Int) = SessionSummary(
         id = rs.getString("id"),

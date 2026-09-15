@@ -3,14 +3,15 @@
 > **Atualize este arquivo ao fechar cada checkpoint.** É o primeiro que o Claude lê ao
 > retomar o trabalho, e o que evita recomeçar o contexto do zero a cada sessão.
 
-**Última atualização:** 15/09/2026 — checkpoint 3.2 fechado
+**Última atualização:** 15/09/2026 — checkpoint 3.3 fechado
 
 ---
 
 ## Fase atual
 
-**🔵 Fase 3 — Consulta (2/4).** Dá para listar as sessões e pedir o resumo de cada uma pela API.
-A pergunta do README — *"qual foi a temperatura máxima?"* — já tem resposta por HTTP.
+**🔵 Fase 3 — Consulta (3/4).** Listar sessões, pedir o resumo e puxar a **série temporal** de um
+sinal — tudo por HTTP. As perguntas do README já têm resposta, inclusive *"o RPM caiu naquela
+curva?"*.
 
 **✅ Fase 2 — Modelo de dados e decodificador: COMPLETA (6/6).** O sistema **recebe, guarda o
 cru, decodifica e não duplica**. O `/ingest` está pronto para o firmware real.
@@ -71,7 +72,9 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 - [x] **Idempotência provada** — 4.123 frames enviados, 1.223 reenviados, 2.900 no banco
 - [x] **`GET /api/v1/sessions`** — 7 ms com 2,16 M frames no banco (meta: 100 ms)
 - [x] **`GET /api/v1/sessions/{id}/summary`** — ~70 ms com 18 M pontos (meta: 200 ms)
-- [x] **Agregado contínuo `signal_1s`** (V6) — 3.658 ms → ~70 ms
+- [x] **Agregado contínuo `signal_1s`** (V6, refeito na V7) — 3.658 ms → ~70 ms
+- [x] **`GET /sessions/{id}/metrics`** — 241 ms para 14.400 pontos, 24 ms para 900
+- [x] Estatísticas cobrem **só leituras válidas** (V7) — o espeto do sensor não distorce o gráfico
 - [x] `docs/02` — **12 ADRs**
 
 ## O que NÃO existe ainda
@@ -87,16 +90,17 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 
 ## Próximo passo
 
-**Checkpoint 3.3 — `GET /api/v1/sessions/{id}/metrics`.** Série temporal agregada por janela.
+**Checkpoint 3.4 — paginação por cursor.** Último da Fase 3.
 
-**Aceite:** sessão inteira em janelas de 1 s dentro de 500 ms; janela de 15 min dentro de 100 ms.
+**Aceite:** demonstrar que o tempo de uma página **não cresce** com a profundidade — o que
+aconteceria com `OFFSET`.
 
-**A infraestrutura já existe:** o agregado contínuo `signal_1s` entrou no 3.2. Falta o endpoint,
-os parâmetros (`signal`, `from`, `to`, `bucket`) e decidir o que fazer quando o `bucket` pedido
-for maior que 1 s — reagregar sobre o agregado, somando somas e contagens.
+É o endpoint `GET /sessions/{id}/frames`, que devolve os frames **crus** paginados. Serve para
+depurar o decodificador: quando um valor sai estranho, o caminho é olhar o payload original
+(`revisar-decodificador` §"se um valor suspeito aparecer no banco").
 
-> ⚠️ Pedir `bucket` **menor** que 1 s não tem resposta possível: o agregado é de 1 s. Precisa
-> virar erro explícito, não resultado silenciosamente errado.
+O porquê de cursor e não `OFFSET` está no [`docs/03`](03-protocolo-ingestao.md): `OFFSET 1000000`
+obriga o banco a contar e descartar um milhão de linhas antes de devolver a página.
 
 ### Como rodar o que já existe
 
@@ -105,8 +109,9 @@ docker compose up -d
 ./gradlew bootRun
 ./gradlew gerador --args="--duracao=30"
 curl localhost:8081/api/v1/sessions
-curl localhost:8081/api/v1/sessions/<id>/summary
-./gradlew test                             # 92 testes
+curl "localhost:8081/api/v1/sessions/<id>/summary"
+curl "localhost:8081/api/v1/sessions/<id>/metrics?signal=rpm&bucket=5s"
+./gradlew test                             # 106 testes
 ```
 
 ### Pendência paralela do Heitor: levantar os sinais reais
