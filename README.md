@@ -90,7 +90,7 @@ Progresso detalhado, checkpoint a checkpoint, em [`docs/12-plano-de-fases.md`](d
 
 - [x] **Fase 0 — Fundação documental.** Domínio, modelo de dados, arquitetura, contratos e requisitos decididos antes do código
 - [x] **Fase 1 — Esqueleto.** Spring Boot + Kotlin, `POST /ingest`, Postgres via compose, primeiro teste com Testcontainers, gerador de dados sintéticos
-- [ ] **Fase 2 — Modelo de dados.** Flyway, hypertable, batch insert, decodificador de frame
+- [x] **Fase 2 — Modelo de dados.** Flyway, hypertable, batch insert, decodificador de frame
 - [ ] **Fase 3 — Consulta.** Agregação por janela de tempo, paginação por cursor
 - [ ] **Fase 4 — Robustez.** API key, rate limiting, validação, Problem Details (RFC 7807), Actuator
 - [ ] **Fase 5 — Deploy.** Dockerfile multi-stage, deploy gerenciado, teste de carga com número medido
@@ -102,7 +102,7 @@ docker compose up -d                    # Postgres 17 + TimescaleDB
 ./gradlew bootRun                       # a API, na porta 8081
 curl localhost:8081/actuator/health     # {"status":"UP"}
 
-./gradlew test                          # 34 testes, com Postgres real
+./gradlew test                          # 79 testes, com Postgres real
 ./gradlew gerador                       # telemetria sintética, sem o carro
 ```
 

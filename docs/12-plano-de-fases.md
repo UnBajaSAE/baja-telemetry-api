@@ -19,7 +19,7 @@ profundidade, não na quantidade de features.
 |---|---|---|---|
 | **0** | Fundação documental | 5 | ✅ **5/5** |
 | **1** | Esqueleto — sobe, recebe, testa | 5 | ✅ **5/5** |
-| **2** | Modelo de dados e decodificador | 6 | 🔵 5/6 |
+| **2** | Modelo de dados e decodificador | 6 | ✅ **6/6** |
 | **3** | Consulta | 4 | ⬜ 0/4 |
 | **4** | Robustez | 5 | ⬜ 0/5 |
 | **5** | Deploy e medição | 4 | ⬜ 0/4 |
@@ -191,9 +191,25 @@ lote com a flag 133 ms** (13,9× mais rápido). O gerador rodou 30 s e gravou 3.
 > para `SUCCESS_NO_INFO`, o que fez a API responder `framesStored: -4`. O teste não pegou porque
 > o container subia **sem** a flag: banco real, driver diferente.
 
-### ⬜ 2.6 · Idempotência ponta a ponta
-**Aceite:** enviar o mesmo lote duas vezes devolve 200 com `duplicate: true` na segunda, e
-`SELECT count(*)` prova que nada duplicou.
+### ✅ 2.6 · Idempotência ponta a ponta
+**Aceite:** o gerador enviou **4.123 frames** em 25 s, dos quais 1.223 eram reenvios com o mesmo
+`batchId`. No banco ficaram **2.900** — exatamente os únicos. Os lotes reenviados voltaram com
+`duplicate: true` e `framesStored: 0`.
+**Fechado em 15/09/2026.** 79 testes.
+
+> **Achado ao sabotar:** a primeira versão do teste de concorrência passava mesmo com a proteção
+> num `if` no código. As 8 threads serializavam no `upsert` da **sessão**, que roda antes da
+> checagem do lote. Criando a sessão antes da largada, o `if` ingênuo passou a produzir
+> **6 `DuplicateKeyException` de 8**. Registrado em [`docs/09 §6.1`](09-estrategia-de-testes.md).
+
+---
+
+## ✅ Fase 2 completa
+
+O sistema **recebe, guarda o cru, decodifica e não duplica**. O `/ingest` está pronto para o
+firmware real — o aviso dos checkpoints anteriores sai aqui.
+
+O que falta é **ler o que foi gravado**: nenhum endpoint de consulta existe ainda. É a Fase 3.
 
 ---
 

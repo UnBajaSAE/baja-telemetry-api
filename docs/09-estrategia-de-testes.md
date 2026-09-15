@@ -172,6 +172,34 @@ framework testaria um banco que não existe em lugar nenhum.
 
 ---
 
+## 6.1 Teste de concorrência pode se enganar sozinho
+
+Descoberto no checkpoint 2.6, e vale como regra geral.
+
+O `IdempotenciaTest` dispara 8 requisições simultâneas com o mesmo `batchId` para provar a
+afirmação do [ADR-008](02-decisoes-tecnicas.md): a proteção tem que estar no banco, porque um
+`if (jaExiste)` no código tem uma fresta.
+
+**A primeira versão do teste passava mesmo com o `if` ingênuo.** O motivo não estava no teste de
+concorrência em si: o serviço faz `upsert` da **sessão** antes de checar o lote, e as 8 threads
+usavam a mesma sessão. A primeira segurava a linha até commitar e as outras sete ficavam na fila
+— quando chegavam na verificação do lote, a primeira já tinha terminado. **A concorrência que se
+queria testar nunca acontecia.**
+
+Criando a sessão antes da largada, o teste passou a discriminar:
+
+| Implementação | Resultado |
+|---|---|
+| `ON CONFLICT DO NOTHING` (a correta) | 8 respostas, 1 gravou, 7 `duplicate` |
+| `if (jaExiste)` no código | 2 respostas, **6 `DuplicateKeyException`** |
+
+> **A regra:** num teste de concorrência, verifique que o ponto disputado é realmente o que você
+> quer testar. Qualquer lock anterior no mesmo fluxo serializa tudo e transforma o teste numa
+> sequência. A única forma confiável de saber é **sabotar a implementação e conferir que o teste
+> reprova**.
+
+---
+
 ## 7. O caminho de erro é teste de primeira classe
 
 Cada linha do catálogo do [`docs/08 §3`](08-contrato-de-erros.md) é um caso de teste — e o que se

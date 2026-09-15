@@ -3,13 +3,14 @@
 > **Atualize este arquivo ao fechar cada checkpoint.** É o primeiro que o Claude lê ao
 > retomar o trabalho, e o que evita recomeçar o contexto do zero a cada sessão.
 
-**Última atualização:** 10/09/2026 — checkpoint 2.5 fechado
+**Última atualização:** 15/09/2026 — **Fase 2 completa**
 
 ---
 
 ## Fase atual
 
-**🔵 Fase 2 — Modelo de dados e decodificador (5/6).** **O sistema grava.** O dado do carro entra pelo `/ingest`, é decodificado e fica no banco.
+**✅ Fase 2 — Modelo de dados e decodificador: COMPLETA (6/6).** O sistema **recebe, guarda o
+cru, decodifica e não duplica**. O `/ingest` está pronto para o firmware real.
 
 **✅ Fase 1 — Esqueleto: COMPLETA (5/5).** A API sobe, o banco roda no Compose, e o `/ingest` já aceita o contrato — mas **ainda não grava nada**.
 
@@ -64,6 +65,7 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 - [x] **Decodificador** — duas propriedades + as três armadilhas, provado capaz de falhar
 - [x] **Persistência em lote** (V4) — o `/ingest` grava cru e decodificado, numa transação
 - [x] **13,9× medido** entre inserção em lote e linha a linha
+- [x] **Idempotência provada** — 4.123 frames enviados, 1.223 reenviados, 2.900 no banco
 
 ## O que NÃO existe ainda
 
@@ -78,29 +80,30 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 
 ## Próximo passo
 
-**Checkpoint 2.6 — idempotência ponta a ponta.** Último da Fase 2.
+**Fase 3 — Consulta.** O dado está gravado, mas **não há como lê-lo pela API**. Hoje só por SQL.
 
-**Aceite:** enviar o mesmo lote duas vezes devolve 200 com `duplicate: true` na segunda, e
-`SELECT count(*)` prova que nada duplicou.
+**Checkpoint 3.1 — `GET /api/v1/sessions`.** Lista as sessões com duração e contagem.
 
-O mecanismo já existe — o `JdbcIngestBatchStore` usa `ON CONFLICT DO NOTHING` e devolve `false`
-quando o `batchId` repete. Falta o teste de ponta a ponta, e rodar o gerador com `--reenviar`
-para ver o aviso dele **parar de aparecer**: hoje ele denuncia que os frames entraram duas vezes
-e a API não percebeu.
+Depois vêm o resumo por sinal (3.2), as métricas por janela com `time_bucket` (3.3) e a paginação
+por cursor (3.4).
+
+> ⚠️ **O 3.3 exige o agregado contínuo** — decidido por medição, não por preferência: sobre uma
+> prova de 4 h, a consulta cai de **6.899 ms para 3,8 ms** ([`docs/10 §2.2`](10-requisitos-nao-funcionais.md)).
 
 ### Como rodar o que já existe
 
 ```bash
 docker compose up -d                       # sobe o banco
 ./gradlew bootRun                          # sobe a API na 8081
-./gradlew test                             # 74 testes
-./gradlew gerador                          # telemetria sintetica -- agora GRAVA
+./gradlew test                             # 79 testes
+./gradlew gerador --args="--reenviar=2"    # grava, e reenvia lotes para ver a idempotencia
 ```
 
-Para ver o que foi gravado:
+Para ver o que foi gravado (por enquanto, só por SQL):
 
 ```sql
-SELECT signal_name, count(*), round(avg(value)::numeric, 1) AS media
+SELECT signal_name, count(*), round(avg(value)::numeric,1) AS media,
+       count(*) FILTER (WHERE NOT is_valid) AS invalidos
 FROM signal_point GROUP BY signal_name ORDER BY 1;
 ```
 
