@@ -309,10 +309,14 @@ Cru comprimido e derivado descartável — o oposto do instinto, e a consequênc
 **Agregado contínuo** (`CREATE MATERIALIZED VIEW ... WITH (timescaledb.continuous)`) mantém médias
 por janela pré-calculadas, atualizadas sozinhas.
 
-Ficava aqui como "decidir na Fase 3, com o número em mãos". **O número foi medido, e ele decide:
-é obrigatório.** Sobre uma prova de enduro de 4 h (18 M pontos), a mesma consulta cai de
-**6.899 ms para 3,8 ms** — e o agregado ocupa 14 MB contra 3.145 MB da tabela bruta. Os números
-completos estão em [`docs/10 §2`](10-requisitos-nao-funcionais.md). **Entra na Fase 3.**
+✅ **Implementado no checkpoint 3.2** (migration V6), e antes do previsto: o plano o colocava no
+3.3, mas o **resumo** já o exigia — 3.658 ms agregando `signal_point` direto, contra meta de
+200 ms. Com ele, ~70 ms.
+
+Duas escolhas de desenho valem registro, e estão no [ADR-012](02-decisoes-tecnicas.md): ele guarda
+**soma e contagem**, nunca `avg()` (senão quem consulta tira média das médias, que só dá certo com
+janelas uniformes); e a **agregação em tempo real é ligada explicitamente**, porque o padrão do
+TimescaleDB mudou para desligada e dado recém-gravado ficaria invisível por até um minuto.
 
 **Tabela `device`** com chave de API por dispositivo entra na Fase 4. Hoje `device_id` é texto
 solto; virar chave estrangeira depois é uma migration simples.

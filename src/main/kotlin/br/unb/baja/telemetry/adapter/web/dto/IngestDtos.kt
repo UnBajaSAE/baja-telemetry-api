@@ -64,3 +64,16 @@ data class SessionDto(
     val rejectedCount: Long,
     val batchCount: Int,
 )
+
+/** Um sinal no resumo de `GET /api/v1/sessions/{id}/summary`. */
+data class SignalSummaryDto(
+    val signal: String,
+    /** Unidade lida do DBC, nao do banco -- a fonte de verdade e o arquivo. */
+    val unit: String?,
+    val canId: Int,
+    val min: Double,
+    val max: Double,
+    val avg: Double,
+    val count: Long,
+    val invalidCount: Long,
+)

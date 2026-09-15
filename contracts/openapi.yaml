@@ -264,17 +264,30 @@ components:
 
     SignalSummary:
       type: object
+      required: [signal, canId, min, max, avg, count, invalidCount]
       properties:
-        signal:  { type: string, example: rpm }
-        unit:    { type: string, example: rpm }
-        min:     { type: number, example: 0 }
-        max:     { type: number, example: 4820.25 }
-        avg:     { type: number, example: 2913.7 }
-        count:   { type: integer, format: int64 }
-        invalid:
+        signal: { type: string, example: rpm }
+        unit:
+          type: string
+          nullable: true
+          description: Lida do DBC, nao do banco. Nula se o sinal saiu do mapa desde entao
+          example: rpm
+        canId: { type: integer, example: 256 }
+        min:   { type: number, example: 0 }
+        max:   { type: number, example: 4820.25 }
+        avg:
+          type: number
+          description: Media PONDERADA pelo numero de pontos de cada janela, nao media de medias
+          example: 2913.7
+        count:
           type: integer
           format: int64
-          description: Pontos fora da faixa do DBC (is_valid = false)
+          description: Todos os pontos, INCLUINDO os marcados como invalidos
+        invalidCount:
+          type: integer
+          format: int64
+          description: Pontos fora da faixa do DBC. Gravados e marcados, nao descartados
+          example: 0
 
     MetricPoint:
       type: object

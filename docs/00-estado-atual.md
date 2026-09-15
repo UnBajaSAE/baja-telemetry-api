@@ -3,14 +3,14 @@
 > **Atualize este arquivo ao fechar cada checkpoint.** É o primeiro que o Claude lê ao
 > retomar o trabalho, e o que evita recomeçar o contexto do zero a cada sessão.
 
-**Última atualização:** 15/09/2026 — checkpoint 3.1 fechado
+**Última atualização:** 15/09/2026 — checkpoint 3.2 fechado
 
 ---
 
 ## Fase atual
 
-**🔵 Fase 3 — Consulta (1/4).** O primeiro endpoint de leitura existe: dá para listar as sessões
-pela API, sem SQL.
+**🔵 Fase 3 — Consulta (2/4).** Dá para listar as sessões e pedir o resumo de cada uma pela API.
+A pergunta do README — *"qual foi a temperatura máxima?"* — já tem resposta por HTTP.
 
 **✅ Fase 2 — Modelo de dados e decodificador: COMPLETA (6/6).** O sistema **recebe, guarda o
 cru, decodifica e não duplica**. O `/ingest` está pronto para o firmware real.
@@ -70,7 +70,9 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 - [x] **13,9× medido** entre inserção em lote e linha a linha
 - [x] **Idempotência provada** — 4.123 frames enviados, 1.223 reenviados, 2.900 no banco
 - [x] **`GET /api/v1/sessions`** — 7 ms com 2,16 M frames no banco (meta: 100 ms)
-- [x] `docs/02` — **11 ADRs**
+- [x] **`GET /api/v1/sessions/{id}/summary`** — ~70 ms com 18 M pontos (meta: 200 ms)
+- [x] **Agregado contínuo `signal_1s`** (V6) — 3.658 ms → ~70 ms
+- [x] `docs/02` — **12 ADRs**
 
 ## O que NÃO existe ainda
 
@@ -85,26 +87,26 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 
 ## Próximo passo
 
-**Checkpoint 3.2 — `GET /api/v1/sessions/{id}/summary`.** Máximo, média e duração por sinal.
+**Checkpoint 3.3 — `GET /api/v1/sessions/{id}/metrics`.** Série temporal agregada por janela.
 
-**Aceite:** para uma sessão, devolve por sinal o mínimo, máximo, média, contagem e quantos pontos
-ficaram marcados como inválidos.
+**Aceite:** sessão inteira em janelas de 1 s dentro de 500 ms; janela de 15 min dentro de 100 ms.
 
-É a consulta que responde a pergunta do README: *"em qual volta a temperatura passou de 100 °C?"*
-— ou pelo menos *"qual foi a temperatura máxima?"*.
+**A infraestrutura já existe:** o agregado contínuo `signal_1s` entrou no 3.2. Falta o endpoint,
+os parâmetros (`signal`, `from`, `to`, `bucket`) e decidir o que fazer quando o `bucket` pedido
+for maior que 1 s — reagregar sobre o agregado, somando somas e contagens.
 
-> ⚠️ **Atenção à lição do 3.1:** este resumo agrega sobre `signal_point`, que é a **maior** tabela
-> do sistema. A medição do [`docs/10 §2.1`](10-requisitos-nao-funcionais.md) mostrou 1.864 ms
-> sobre uma prova de 4 h — contra meta de 200 ms. Medir antes de escolher o caminho.
+> ⚠️ Pedir `bucket` **menor** que 1 s não tem resposta possível: o agregado é de 1 s. Precisa
+> virar erro explícito, não resultado silenciosamente errado.
 
 ### Como rodar o que já existe
 
 ```bash
-docker compose up -d                       # sobe o banco
-./gradlew bootRun                          # sobe a API na 8081
-./gradlew gerador --args="--duracao=30"    # gera e grava telemetria
-curl localhost:8081/api/v1/sessions        # lista o que foi gravado
-./gradlew test                             # 85 testes
+docker compose up -d
+./gradlew bootRun
+./gradlew gerador --args="--duracao=30"
+curl localhost:8081/api/v1/sessions
+curl localhost:8081/api/v1/sessions/<id>/summary
+./gradlew test                             # 92 testes
 ```
 
 ### Pendência paralela do Heitor: levantar os sinais reais

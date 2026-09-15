@@ -12,6 +12,9 @@ import java.net.URI
 class BatchTooLargeException(val actual: Int, val max: Int) :
     RuntimeException("lote com $actual frames; o maximo e $max")
 
+/** Sessao inexistente. Vira 404. */
+class SessionNotFoundException(val id: String) : RuntimeException("sessao '$id' nao existe")
+
 /** sessionId fora do formato AAAA-MM-DD-slug (ADR-007). Vira 422. */
 class InvalidSessionIdException(val raw: String) :
     RuntimeException("sessionId '$raw' fora do formato AAAA-MM-DD-slug")
@@ -59,6 +62,18 @@ class ProblemDetailsHandler {
             "Lote acima do limite",
             "O lote tem ${e.actual} frames; o maximo e ${e.max}. Refatie e reenvie " +
                 "-- cada fatia com um batchId novo.",
+            retryable = false,
+        )
+
+    @ExceptionHandler(SessionNotFoundException::class)
+    fun sessionNotFound(e: SessionNotFoundException): ProblemDetail =
+        problem(
+            HttpStatus.NOT_FOUND,
+            "session-not-found",
+            "Sessao nao encontrada",
+            "Nenhuma sessao com id '${e.id}'. Use GET /api/v1/sessions para ver as existentes.",
+            // Consulta, nao ingestao: o `retryable` aqui e para o cliente de
+            // leitura. Retentar a mesma URL nao vai fazer a sessao aparecer.
             retryable = false,
         )
 

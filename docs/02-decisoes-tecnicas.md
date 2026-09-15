@@ -551,3 +551,84 @@ seria armadilha para a próxima pessoa. O `docs/06` foi corrigido junto.
 **O número passa a vir de uma soma, não de um campo pronto.** Se um dia a listagem precisar de
 algo que a `ingest_batch` não sabe responder — por exemplo, contagem por sinal — essa decisão terá
 que ser revisitada. Para duração e contagem de frames, ela basta.
+
+---
+
+## ADR-012 · Agregado contínuo de 1 segundo
+
+**Status:** aceito
+
+### Contexto
+
+O `GET /sessions/{id}/summary` precisa do mínimo, máximo e média de cada sinal na sessão inteira.
+A `signal_point` é a maior tabela do sistema — uma prova de enduro de 4 h tem 18 milhões de
+pontos.
+
+Medido, com os índices já existentes:
+
+| Origem | Tempo |
+|---|---|
+| Agregando `signal_point` direto | **3.658 ms** |
+| Sobre o agregado contínuo | **29,7 ms** |
+
+A meta do [`docs/10`](10-requisitos-nao-funcionais.md) é 200 ms. A consulta direta fica **18×**
+acima — e nem é o pior caso: a série por janela de 1 s da mesma sessão custava 6.899 ms.
+
+O [`docs/06 §6`](06-modelo-de-dados.md) já tinha registrado, na Fase 0, que a decisão seria
+tomada "com o número em mãos". O número apareceu.
+
+### Decisão
+
+Um agregado contínuo `signal_1s`, agrupando por sessão, sinal e janela de 1 segundo.
+
+Ele guarda **soma e contagem**, não média. E é criado com **agregação em tempo real ligada**.
+
+### Duas escolhas dentro da decisão
+
+**Soma e contagem, nunca `avg()`.** Guardar a média de cada janela obrigaria quem consulta a
+tirar média das médias — o que só dá certo se todas as janelas tiverem o mesmo número de pontos.
+Com 2 leituras a 800 rpm numa janela e 198 a 4.000 na seguinte, a média das médias dá **2.400 rpm**
+e a ponderada dá **3.968**. Na nossa telemetria de taxa constante as janelas são quase uniformes e
+o erro seria pequeno — mas gaps e bordas de sessão existem, e guardar as duas colunas custa nada.
+
+**`materialized_only = false`, explicitamente.** Nas versões recentes do TimescaleDB o padrão
+virou `true`: a consulta só enxerga o que a política já materializou. Isso faria quem termina uma
+bateria e pede o resumo na hora **não ver nada** por até um minuto — o "mandei e não apareceu" que
+o [`docs/07 §5`](07-arquitetura-do-codigo.md) citou ao recusar decodificação assíncrona. Foi
+descoberto porque havia um teste específico para isso.
+
+**A janela da política é de 8 dias, não 1.** O [`docs/03`](03-protocolo-ingestao.md) aceita frames
+com até 7 dias de idade, e o [ADR-004](02-decisoes-tecnicas.md) diz que dado chega **fora de
+ordem**: um buffer de ontem aparece hoje, com carimbo de ontem. Uma janela de 1 dia deixaria esse
+dado sem materializar para sempre. Varrer 8 dias não custa, porque o TimescaleDB registra quais
+janelas foram invalidadas por inserção e só reprocessa essas.
+
+### Alternativas consideradas
+
+**Índice melhor sobre `signal_point`.** Foi o primeiro reflexo, e a Fase 0 já tinha medido que não
+resolve: o índice composto rende 1,4× na agregação de sessão inteira, porque o TimescaleDB já cria
+um índice de tempo sozinho. O problema não é encontrar as linhas — é que são 18 milhões delas.
+
+**Manter os agregados por lote**, como o [ADR-011](02-decisoes-tecnicas.md) fez para a listagem.
+Funcionaria para contagem e faixa, mas não para série temporal: o checkpoint 3.3 precisa de
+mínimo, máximo e média **por janela de tempo**, e um lote não se alinha a janela nenhuma. Seria
+resolver metade do problema e ter que fazer o agregado contínuo do mesmo jeito.
+
+### Consequências
+
+**Medido depois de implementar:** o endpoint responde em **~70 ms** com 18 milhões de pontos.
+
+**A criação é cara e não roda em transação.** Materializar 18 milhões de pontos levou 84 s, e o
+Postgres recusa `CREATE MATERIALIZED VIEW ... WITH DATA` dentro de transação — a migration tem um
+`.sql.conf` com `executeInTransaction=false`. Em troca, ela **não tem rollback automático**: se
+falhar no meio, a view pode ficar sem a política e a correção é manual.
+
+**A consulta paga o rabo recente.** Com agregação em tempo real, o que ainda não foi materializado
+é lido da `signal_point` ao vivo. O rabo é de minutos, então o custo é pequeno — mas num pico de
+ingestão ele cresce, e vale remedir na Fase 5.
+
+**O agregado é armazenamento a mais.** Medido na Fase 0: 14 MB contra 3.145 MB da tabela bruta,
+**225× menor**, porque 4 h viram 14.400 janelas por sinal em vez de 18 milhões de pontos.
+
+**Ele é descartável.** Como a `signal_point`, o agregado é derivado e pode ser reconstruído — o
+que preserva a propriedade do [ADR-001](02-decisoes-tecnicas.md).

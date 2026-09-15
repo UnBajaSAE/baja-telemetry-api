@@ -109,7 +109,7 @@ inteira — **é o agregado contínuo.**
 
 | Métrica | Alvo | Situação hoje |
 |---|---|---|
-| `GET /sessions/{id}/summary` | ≤ 200 ms | ✅ 22 ms **com** agregado · ❌ 1.864 ms sem |
+| `GET /sessions/{id}/summary` | ≤ 200 ms | ✅ **~70 ms** medido no endpoint real, com 18 M pontos |
 | `GET /metrics`, janela ≤ 15 min | ≤ 100 ms | ✅ 38 ms |
 | `GET /metrics`, sessão inteira | ≤ 500 ms | ✅ 3,8 ms **com** agregado · ❌ 6.899 ms sem |
 | `GET /sessions` (lista) | ≤ 100 ms | ✅ **7 ms** com 2,16 M frames no banco — ver abaixo |

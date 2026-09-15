@@ -20,7 +20,7 @@ profundidade, não na quantidade de features.
 | **0** | Fundação documental | 5 | ✅ **5/5** |
 | **1** | Esqueleto — sobe, recebe, testa | 5 | ✅ **5/5** |
 | **2** | Modelo de dados e decodificador | 6 | ✅ **6/6** |
-| **3** | Consulta | 4 | 🔵 1/4 |
+| **3** | Consulta | 4 | 🔵 2/4 |
 | **4** | Robustez | 5 | ⬜ 0/5 |
 | **5** | Deploy e medição | 4 | ⬜ 0/4 |
 
@@ -224,7 +224,16 @@ mais recente para a mais antiga, com duração vinda do relógio do **dispositiv
 > de uma prova de enduro. Manter o agregado na linha da sessão seria trivial de consultar, mas
 > colocaria todo lote disputando a mesma linha — e o checkpoint 2.6 já tinha provado que isso
 > serializa. Cada lote grava o próprio min/max ([ADR-011](02-decisoes-tecnicas.md)).
-### ⬜ 3.2 · `GET /sessions/{id}/summary` — máximo, média e duração por sinal
+### ✅ 3.2 · `GET /sessions/{id}/summary` — máximo, média e duração por sinal
+**Aceite:** **~70 ms** com 18 M pontos (meta: 200 ms), contra **3.658 ms** agregando
+`signal_point` direto. 92 testes.
+**Fechado em 15/09/2026.** O agregado contínuo entrou aqui, **antes do previsto**: o plano o
+colocava no 3.3, mas a medição mostrou que o resumo já precisava dele ([ADR-012](02-decisoes-tecnicas.md)).
+
+> **Dois achados.** O padrão do `materialized_only` no TimescaleDB virou `true` nas versões
+> recentes — dado recém-gravado ficaria invisível por até um minuto. E a janela da política
+> precisou de 8 dias, não 1, porque o `docs/03` aceita frames com até 7 dias e o ADR-004 diz que
+> eles chegam fora de ordem.
 ### ⬜ 3.3 · `GET /sessions/{id}/metrics` — agregação por janela com `time_bucket`
 ⚠️ **Exige agregado contínuo** — decidido por medição, não por preferência ([`docs/10 §2.2`](10-requisitos-nao-funcionais.md)).
 **Aceite:** sessão inteira em janelas de 1 s dentro de 500 ms; resumo da sessão dentro de 200 ms.
