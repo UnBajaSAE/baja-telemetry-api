@@ -33,6 +33,9 @@ interface IngestBatchStore {
         deviceId: String,
         frameCount: Int,
         rejectedCount: Int,
+        /** Menor e maior `frame_time` do lote. Nulos se nenhum frame foi aceito. */
+        primeiroFrameEm: Instant?,
+        ultimoFrameEm: Instant?,
     ): Boolean
 
     fun marcarDecodificado(batchId: UUID)

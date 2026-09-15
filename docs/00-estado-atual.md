@@ -3,11 +3,14 @@
 > **Atualize este arquivo ao fechar cada checkpoint.** É o primeiro que o Claude lê ao
 > retomar o trabalho, e o que evita recomeçar o contexto do zero a cada sessão.
 
-**Última atualização:** 15/09/2026 — **Fase 2 completa**
+**Última atualização:** 15/09/2026 — checkpoint 3.1 fechado
 
 ---
 
 ## Fase atual
+
+**🔵 Fase 3 — Consulta (1/4).** O primeiro endpoint de leitura existe: dá para listar as sessões
+pela API, sem SQL.
 
 **✅ Fase 2 — Modelo de dados e decodificador: COMPLETA (6/6).** O sistema **recebe, guarda o
 cru, decodifica e não duplica**. O `/ingest` está pronto para o firmware real.
@@ -34,7 +37,7 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 - [x] Repositório criado em `UnBajaSAE/baja-telemetry-api` (público)
 - [x] README com problema, arquitetura, stack e roadmap
 - [x] `docs/01` — domínio CAN documentado
-- [x] `docs/02` — 10 ADRs registrados
+
 - [x] `docs/03` — contrato de ingestão esboçado
 - [x] `docs/04` — glossário
 - [x] `docs/05` — o que é DBC e por quê, numeração de bits, template de levantamento
@@ -66,6 +69,8 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 - [x] **Persistência em lote** (V4) — o `/ingest` grava cru e decodificado, numa transação
 - [x] **13,9× medido** entre inserção em lote e linha a linha
 - [x] **Idempotência provada** — 4.123 frames enviados, 1.223 reenviados, 2.900 no banco
+- [x] **`GET /api/v1/sessions`** — 7 ms com 2,16 M frames no banco (meta: 100 ms)
+- [x] `docs/02` — **11 ADRs**
 
 ## O que NÃO existe ainda
 
@@ -80,31 +85,26 @@ real. **A próxima sessão começa a Fase 1 — a primeira linha de Kotlin.**
 
 ## Próximo passo
 
-**Fase 3 — Consulta.** O dado está gravado, mas **não há como lê-lo pela API**. Hoje só por SQL.
+**Checkpoint 3.2 — `GET /api/v1/sessions/{id}/summary`.** Máximo, média e duração por sinal.
 
-**Checkpoint 3.1 — `GET /api/v1/sessions`.** Lista as sessões com duração e contagem.
+**Aceite:** para uma sessão, devolve por sinal o mínimo, máximo, média, contagem e quantos pontos
+ficaram marcados como inválidos.
 
-Depois vêm o resumo por sinal (3.2), as métricas por janela com `time_bucket` (3.3) e a paginação
-por cursor (3.4).
+É a consulta que responde a pergunta do README: *"em qual volta a temperatura passou de 100 °C?"*
+— ou pelo menos *"qual foi a temperatura máxima?"*.
 
-> ⚠️ **O 3.3 exige o agregado contínuo** — decidido por medição, não por preferência: sobre uma
-> prova de 4 h, a consulta cai de **6.899 ms para 3,8 ms** ([`docs/10 §2.2`](10-requisitos-nao-funcionais.md)).
+> ⚠️ **Atenção à lição do 3.1:** este resumo agrega sobre `signal_point`, que é a **maior** tabela
+> do sistema. A medição do [`docs/10 §2.1`](10-requisitos-nao-funcionais.md) mostrou 1.864 ms
+> sobre uma prova de 4 h — contra meta de 200 ms. Medir antes de escolher o caminho.
 
 ### Como rodar o que já existe
 
 ```bash
 docker compose up -d                       # sobe o banco
 ./gradlew bootRun                          # sobe a API na 8081
-./gradlew test                             # 79 testes
-./gradlew gerador --args="--reenviar=2"    # grava, e reenvia lotes para ver a idempotencia
-```
-
-Para ver o que foi gravado (por enquanto, só por SQL):
-
-```sql
-SELECT signal_name, count(*), round(avg(value)::numeric,1) AS media,
-       count(*) FILTER (WHERE NOT is_valid) AS invalidos
-FROM signal_point GROUP BY signal_name ORDER BY 1;
+./gradlew gerador --args="--duracao=30"    # gera e grava telemetria
+curl localhost:8081/api/v1/sessions        # lista o que foi gravado
+./gradlew test                             # 85 testes
 ```
 
 ### Pendência paralela do Heitor: levantar os sinais reais

@@ -112,7 +112,22 @@ inteira — **é o agregado contínuo.**
 | `GET /sessions/{id}/summary` | ≤ 200 ms | ✅ 22 ms **com** agregado · ❌ 1.864 ms sem |
 | `GET /metrics`, janela ≤ 15 min | ≤ 100 ms | ✅ 38 ms |
 | `GET /metrics`, sessão inteira | ≤ 500 ms | ✅ 3,8 ms **com** agregado · ❌ 6.899 ms sem |
-| `GET /sessions` (lista) | ≤ 100 ms | dezenas de linhas — trivial |
+| `GET /sessions` (lista) | ≤ 100 ms | ✅ **7 ms** com 2,16 M frames no banco — ver abaixo |
+
+### 2.5 A listagem de sessões — e por que ela é barata
+
+Medido no checkpoint 3.1: **7 ms** com 2.161.712 frames no banco.
+
+O número não vem de otimização de consulta, e sim de **onde o agregado mora**. A listagem toca
+**39 linhas** de `ingest_batch`, não 2,16 milhões de `raw_frame`:
+
+| Origem | Linhas tocadas | Tempo |
+|---|---|---|
+| `raw_frame` | 2.200.000 | 220 ms — **estoura a meta** |
+| `ingest_batch` | 36 | 1,5 ms |
+
+E a diferença cresce: `raw_frame` acompanha a temporada, `ingest_batch` acompanha o número de
+lotes. Ver [ADR-011](02-decisoes-tecnicas.md).
 
 **Como medir:** `\timing on` no `psql` contra dado do gerador sintético, e depois `EXPLAIN
 (ANALYZE, BUFFERS)` em qualquer consulta que estourar a meta.

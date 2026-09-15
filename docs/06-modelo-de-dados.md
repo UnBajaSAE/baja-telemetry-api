@@ -62,8 +62,6 @@ sobre quando as coisas aconteceram no carro, não sobre quando o WiFi voltou.
 CREATE TABLE session (
     id           TEXT PRIMARY KEY,
     description  TEXT,
-    started_at   TIMESTAMPTZ,
-    ended_at     TIMESTAMPTZ,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ```
@@ -73,8 +71,11 @@ CREATE TABLE session (
 poder olhar a lista de sessões e entender o que é cada uma, sem consultar outra tabela, ganha
 aqui. O custo aceito é que um erro de digitação cria uma sessão fantasma.
 
-**`started_at` e `ended_at` são derivados**, não informados: são o menor e o maior `frame_time`
-já visto para a sessão. Ficam nulos até chegar o primeiro lote.
+**Não há `started_at` nem `ended_at` aqui.** Elas existiram no rascunho da Fase 0 como colunas
+derivadas, e foram **removidas na V5**: mantê-las exigiria um `UPDATE` na linha da sessão a cada
+lote, e o [checkpoint 2.6](12-plano-de-fases.md) provou que disputar a mesma linha serializa
+requisições concorrentes. A duração agora é agregada da `ingest_batch` — ver
+[ADR-011](02-decisoes-tecnicas.md) e a §3.2.
 
 ### 3.2 `ingest_batch`
 
@@ -86,10 +87,14 @@ CREATE TABLE ingest_batch (
     frame_count     INTEGER NOT NULL,
     rejected_count  INTEGER NOT NULL DEFAULT 0,
     received_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-    decoded_at      TIMESTAMPTZ
+    decoded_at      TIMESTAMPTZ,
+    -- Menor e maior frame_time DESTE lote (ADR-011)
+    first_frame_at  TIMESTAMPTZ,
+    last_frame_at   TIMESTAMPTZ
 );
 
-CREATE INDEX idx_batch_session ON ingest_batch (session_id, received_at DESC);
+CREATE INDEX idx_batch_session        ON ingest_batch (session_id, received_at DESC);
+CREATE INDEX idx_batch_sessao_inicio  ON ingest_batch (session_id, first_frame_at);
 ```
 
 **Esta tabela é a idempotência inteira** (ADR-008). O `id` é o `batchId` que o ESP32 gerou. Lote
@@ -99,6 +104,11 @@ isso, no banco, e não uma verificação no código que duas requisições simul
 **`rejected_count` torna auditável a perda aceita pelo [ADR-010](02-decisoes-tecnicas.md).** Um
 lote pode entrar com frames inválidos descartados; se esse número subir numa sessão, o problema é
 físico — cartão SD ruim, alimentação instável — e o gráfico de rejeições é o que denuncia.
+
+**`first_frame_at` e `last_frame_at` são o que torna o `GET /sessions` barato.** Cada lote grava
+o próprio mínimo e máximo na linha que já estava sendo inserida — zero contenção — e a listagem
+agrega sobre milhares de linhas em vez de milhões. Medido com 2,2 M frames: **1,5 ms** contra
+**220 ms** varrendo a `raw_frame` ([ADR-011](02-decisoes-tecnicas.md)).
 
 **`decoded_at` nulo significa "cru gravado, sinais ainda não"** — o que permite reprocessar sem
 adivinhar o que já foi feito, e sobreviver a um crash no meio do processamento.

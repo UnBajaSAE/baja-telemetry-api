@@ -69,7 +69,11 @@ class IngestService(
         // 2. Registrar o lote e o ponto de deteccao de repetido. A chave primaria
         //    decide -- nao uma consulta previa, que duas requisicoes simultaneas
         //    driblariam (ADR-008).
-        val novo = batches.registrar(batchId, sessionId, deviceId, frames.size, rejeicoes.size)
+        val novo = batches.registrar(
+            batchId, sessionId, deviceId, frames.size, rejeicoes.size,
+            primeiroFrameEm = aceitos.minOfOrNull { it.readAt },
+            ultimoFrameEm = aceitos.maxOfOrNull { it.readAt },
+        )
         if (!novo) {
             log.info("Lote {} ja processado; nada foi gravado de novo", batchId)
             return IngestOutcome(frames.size, 0, 0, rejeicoes, duplicate = true)

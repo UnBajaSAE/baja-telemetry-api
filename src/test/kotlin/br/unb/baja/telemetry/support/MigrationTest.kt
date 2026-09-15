@@ -37,10 +37,13 @@ class MigrationTest(
     @Test
     fun `as tabelas base existem com as colunas do docs-06`() {
         val esperado = mapOf(
-            "session" to listOf("id", "description", "started_at", "ended_at", "created_at"),
+            // started_at/ended_at sairam da session na V5: nunca eram preenchidas,
+            // e a informacao passou a vir agregada da ingest_batch (ADR-011).
+            "session" to listOf("id", "description", "created_at"),
             "ingest_batch" to listOf(
                 "id", "session_id", "device_id", "frame_count",
                 "rejected_count", "received_at", "decoded_at",
+                "first_frame_at", "last_frame_at",
             ),
             "signal_definition" to listOf(
                 "dbc_version", "can_id", "signal_name", "start_bit", "bit_length",

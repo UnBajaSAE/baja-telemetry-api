@@ -46,16 +46,25 @@ class JdbcIngestBatchStore(private val jdbc: JdbcTemplate) : IngestBatchStore {
         deviceId: String,
         frameCount: Int,
         rejectedCount: Int,
+        primeiroFrameEm: Instant?,
+        ultimoFrameEm: Instant?,
     ): Boolean {
         // ON CONFLICT DO NOTHING devolve 0 linhas afetadas quando a chave ja
         // existe. E assim que o lote repetido e reconhecido -- pelo banco.
+        //
+        // O min/max vai nesta MESMA linha, que ja estava sendo inserida: e o que
+        // permite o GET /sessions agregar sobre milhares de linhas em vez de
+        // milhoes, sem nenhum lock disputado (ADR-011).
         val linhas = jdbc.update(
             """
-            INSERT INTO ingest_batch (id, session_id, device_id, frame_count, rejected_count)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO ingest_batch
+              (id, session_id, device_id, frame_count, rejected_count, first_frame_at, last_frame_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (id) DO NOTHING
             """,
             batchId, sessionId.value, deviceId, frameCount, rejectedCount,
+            primeiroFrameEm?.let { Timestamp.from(it) },
+            ultimoFrameEm?.let { Timestamp.from(it) },
         )
         return linhas > 0
     }

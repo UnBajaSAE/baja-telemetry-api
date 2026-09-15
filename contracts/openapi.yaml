@@ -237,12 +237,30 @@ components:
 
     Session:
       type: object
+      required: [id, frameCount, rejectedCount, batchCount]
       properties:
         id:          { type: string, example: 2026-08-24-teste-suspensao }
-        description: { type: string, example: Bateria de suspensao }
-        startedAt:   { type: string, format: date-time }
-        endedAt:     { type: string, format: date-time }
-        frameCount:  { type: integer, format: int64, example: 3600000 }
+        description: { type: string, nullable: true, example: Bateria de suspensao }
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            Menor horario de LEITURA dos frames, pelo relogio do dispositivo -- nao o de
+            recebimento. Nulo enquanto a sessao nao tiver nenhum frame valido.
+        endedAt:   { type: string, format: date-time, nullable: true }
+        durationSeconds:
+          type: integer
+          format: int64
+          nullable: true
+          example: 7199
+        frameCount:
+          type: integer
+          format: int64
+          description: Frames RECEBIDOS na sessao, incluindo os rejeitados
+          example: 720000
+        rejectedCount: { type: integer, format: int64, example: 0 }
+        batchCount:    { type: integer, example: 12 }
 
     SignalSummary:
       type: object

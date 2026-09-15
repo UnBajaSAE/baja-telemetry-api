@@ -478,3 +478,76 @@ independente do backend.
 **A resposta de sucesso fica mais rica** — o firmware precisa comparar `framesReceived` com
 `framesStored` em vez de só olhar o status. Custo pequeno, e o
 [`docs/08 §2.1`](08-contrato-de-erros.md) mantém a decisão do firmware simples.
+
+---
+
+## ADR-011 · Agregados de sessão guardados por lote
+
+**Status:** aceito
+
+### Contexto
+
+O `GET /sessions` precisa devolver, para cada sessão, **quando começou, quando terminou e quantos
+frames tem**. A informação existe — está espalhada em milhões de linhas de `raw_frame` — mas
+juntá-la a cada consulta é caro.
+
+O rascunho da Fase 0 tinha colunas `started_at` e `ended_at` na tabela `session`, declaradas como
+"derivadas". Nada nunca as preencheu: quando a persistência chegou no checkpoint 2.5, elas
+continuaram nulas. A decisão de **como** derivá-las ficou em aberto até aqui.
+
+O fato que decide é uma medição, com 2,2 milhões de frames em três sessões:
+
+| Origem do agregado | Linhas tocadas | Tempo |
+|---|---|---|
+| `raw_frame` | 2.200.000 | **220 ms** |
+| `ingest_batch` | 36 | **1,5 ms** |
+
+A meta do [`docs/10`](10-requisitos-nao-funcionais.md) para essa consulta é **≤ 100 ms**. Varrer o
+cru já a estoura com menos de uma prova de enduro dentro — e a `raw_frame` cresce com a temporada,
+enquanto a `ingest_batch` cresce com o número de lotes.
+
+### Decisão
+
+Cada lote grava o **próprio** menor e maior `frame_time`, em duas colunas novas de `ingest_batch`.
+O `GET /sessions` agrega sobre essa tabela.
+
+As colunas `session.started_at` e `session.ended_at` foram **removidas** na migration V5.
+
+### Alternativas consideradas
+
+**Manter `started_at`/`ended_at` na linha da sessão, com `UPDATE` a cada lote.** A consulta ficaria
+trivial — ler uma linha pronta, sem agregação. É a opção mais óbvia, e tem um argumento real a
+favor: nenhum custo de leitura.
+
+Descartada por causa de um resultado do checkpoint anterior. O 2.6 mostrou que **oito requisições
+simultâneas para a mesma sessão serializam no `upsert` da linha da sessão** — a primeira segura a
+linha até commitar e as outras ficam na fila. Acrescentar um `UPDATE` na mesma linha a cada lote
+transformaria esse acidente em desenho: com quatro nós enviando ao mesmo tempo, eles entrariam em
+fila no ponto do sistema onde a taxa de escrita importa. A alternativa escolhida não tem
+contenção nenhuma, porque cada requisição escreve **a sua própria** linha — que já estava sendo
+inserida de qualquer forma.
+
+**Agregado contínuo do TimescaleDB.** Uma view materializada mantida pelo banco, sem mudar código
+de escrita. Descartada aqui por dois motivos: ela é a ferramenta certa para agregar por **janela
+de tempo** (o caso do checkpoint 3.3, onde levou a consulta de 6.899 ms para 3,8 ms), e não para
+agrupar por sessão; e o *refresh* dela lê a `raw_frame`, ou seja, paga o custo que se está
+tentando evitar — só que em segundo plano.
+
+### Consequências
+
+**Medido depois de implementar:** o endpoint responde em **7 ms** com 2,16 milhões de frames no
+banco, porque a consulta toca 39 linhas em vez de 2,16 milhões.
+
+**Duas colunas podem ficar nulas.** Um lote em que nenhum frame foi aceito não tem mínimo nem
+máximo. A listagem trata isso: a sessão aparece com duração nula em vez de sumir.
+
+**A migration precisou de *backfill*.** Os lotes que já existiam não tinham as colunas. O
+`UPDATE` que as preenche a partir de `raw_frame` roda uma vez, e levou 1,4 s para 2,1 milhões de
+linhas — aceitável, mas num banco de produção grande vale rodar fora do horário de coleta.
+
+**Colunas mortas foram removidas, não deixadas.** `session.started_at` sempre nula, com esse nome,
+seria armadilha para a próxima pessoa. O `docs/06` foi corrigido junto.
+
+**O número passa a vir de uma soma, não de um campo pronto.** Se um dia a listagem precisar de
+algo que a `ingest_batch` não sabe responder — por exemplo, contagem por sinal — essa decisão terá
+que ser revisitada. Para duração e contagem de frames, ela basta.

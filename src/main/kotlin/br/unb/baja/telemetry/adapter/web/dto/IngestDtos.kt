@@ -51,3 +51,16 @@ data class IngestResponseDto(
 )
 
 data class RejectionDto(val index: Int, val reason: String, val detail: String)
+
+/** Uma sessao na listagem do `GET /api/v1/sessions`. */
+data class SessionDto(
+    val id: String,
+    val description: String?,
+    /** ISO-8601. Nulo enquanto a sessao nao tiver frame valido nenhum. */
+    val startedAt: String?,
+    val endedAt: String?,
+    val durationSeconds: Long?,
+    val frameCount: Long,
+    val rejectedCount: Long,
+    val batchCount: Int,
+)
